@@ -7,3 +7,4 @@ edition = "2024"
 anyhow = "1.0.100"
 gpui = "0.2.1"
 gpui-component = { git = "https://github.com/longbridge/gpui-component"}
+rust-embed = "8.7.2"
