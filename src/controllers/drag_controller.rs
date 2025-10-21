@@ -1,12 +1,12 @@
 use gpui::{
-    App, Context, DragMoveEvent, Entity, InteractiveElement, IntoElement, MouseEvent,
-    MouseMoveEvent, ParentElement, Render, StatefulInteractiveElement, Styled, Window, div,
-    prelude::FluentBuilder, px, rgb, white,
+    App, AppContext, Context, DragMoveEvent, Entity, InteractiveElement, IntoElement,
+    ParentElement, Render, StatefulInteractiveElement, Styled, Window, blue, div,
+    prelude::FluentBuilder, px,
 };
 use gpui_component::{ActiveTheme, Icon, IconName};
 use uuid::Uuid;
 
-use crate::screens::parts::document::DocumentState;
+use crate::{entities::elements::Element, screens::parts::document::DocumentState};
 
 #[derive(Clone, PartialEq)]
 pub enum MovingElement {
@@ -106,30 +106,31 @@ impl DragController {
         let mouse_position = event.event.position;
         let bounds = event.bounds;
 
+        //     bounds.origin.x,
+        //     mouse_position.x < bounds.origin.x
+        // );
+
         let is_outside = mouse_position.x < bounds.origin.x
             || mouse_position.y < bounds.origin.y
             || mouse_position.x > bounds.origin.x + bounds.size.width
             || mouse_position.y > bounds.origin.y + bounds.size.height;
 
         if is_outside.clone() {
-            println!("DragController::on_outside: Mouse is outside bounds. Stopping drag.");
             self.stop_drag();
-        } else {
-            println!("DragController::on_outside: Mouse is inside bounds.");
         }
 
         is_outside
     }
 }
 
-pub struct DragElement<T: Render> {
+pub struct DragElement {
     pub id: Uuid,
-    pub child: Entity<T>,
+    pub child: Element,
     pub state: Entity<DocumentState>,
 }
 
-impl<T: Render> DragElement<T> {
-    pub fn new(id: Uuid, state: Entity<DocumentState>, child: Entity<T>) -> Self {
+impl DragElement {
+    pub fn new(id: Uuid, state: Entity<DocumentState>, child: Element) -> Self {
         Self { id, child, state }
     }
 
@@ -156,35 +157,22 @@ impl<T: Render> DragElement<T> {
     }
 }
 
-impl<T: Render> Render for DragElement<T> {
+impl Render for DragElement {
     fn render(&mut self, _: &mut Window, ctx: &mut Context<Self>) -> impl IntoElement {
         let element = self.child.clone();
         let is_dragging = self.state.read(ctx).drag_controller.borrow().is_dragging;
 
-        let index = element.entity_id();
-
         div()
+            .group("drag_element")
             .w_full()
             .flex()
             .justify_center()
             .items_center()
-            .bg(ctx.theme().background)
+            // .bg(ctx.theme().background)
+            .bg(blue())
             .relative()
-            .on_mouse_move(ctx.listener(
-                move |this: &mut DragElement<T>,
-                      event: &MouseMoveEvent,
-                      _: &mut Window,
-                      cx: &mut Context<DragElement<T>>| {
-                    this.state.update(
-                        cx,
-                        |this: &mut DocumentState, _: &mut Context<DocumentState>| {
-                            this.pointer_position = Some(event.position);
-                        },
-                    );
-                },
-            ))
             .on_drag_move(
-                ctx.listener(move |this, event: &DragMoveEvent<Entity<T>>, _, ctx| {
+                ctx.listener(move |this, event: &DragMoveEvent<Element>, _, ctx| {
                     let controller = this.state.read(ctx).drag_controller.clone();
 
                     let bounds = event.bounds;
@@ -204,6 +192,7 @@ impl<T: Render> Render for DragElement<T> {
                         if controller.borrow().hovered_drop_zone != Some((this.id, zone.clone())) {
                             controller.borrow_mut().hovered_drop_zone =
                                 Some((this.id, zone.clone()));
+
                             ctx.notify();
                         }
                     } else {
@@ -232,13 +221,15 @@ impl<T: Render> Render for DragElement<T> {
             )
             .child(
                 div()
+                    .invisible()
+                    .group_hover("drag_element", |this| this.visible())
                     .absolute()
                     .left_0()
                     .flex()
                     .gap_1()
                     .child(
                         div()
-                            .id(("add", index))
+                            .id("add_button")
                             .size_6()
                             .hover(|this| {
                                 this.bg(ctx.theme().background.opacity(0.3)).cursor_grab()
@@ -255,7 +246,7 @@ impl<T: Render> Render for DragElement<T> {
                     )
                     .child(
                         div()
-                            .id(("drag", index))
+                            .id("drag_button")
                             .size_6()
                             .hover(|this| {
                                 this.bg(ctx.theme().background.opacity(0.3)).cursor_grab()
@@ -272,8 +263,8 @@ impl<T: Render> Render for DragElement<T> {
                             .when(is_dragging, |this| this.cursor_move())
                             .on_drag(
                                 element.clone(),
-                                move |element, _, _window: &mut Window, _: &mut App| {
-                                    element.clone()
+                                move |element, _, _window: &mut Window, cx: &mut App| {
+                                    cx.new(|_| element.clone())
                                 },
                             ),
                     ),
@@ -282,33 +273,9 @@ impl<T: Render> Render for DragElement<T> {
                 div()
                     .relative()
                     .flex_1()
-                    .ml_10()
-                    .child(element)
-                    .when(is_dragging, |this| {
-                        let top_dropable_zone_element = div()
-                            .absolute()
-                            .tab_index(2)
-                            .w_full()
-                            .h_1_2()
-                            .top_0()
-                            .on_drop(ctx.listener(move |this, _: &Entity<T>, _, ctx| {
-                                this.on_drop(this.id, MovingElement::After, ctx);
-                                ctx.notify();
-                            }));
-
-                        let bottom_dropable_zone_element = div()
-                            .absolute()
-                            .tab_index(2)
-                            .w_full()
-                            .h_1_2()
-                            .bottom_0()
-                            .on_drop(ctx.listener(move |this, _: &Entity<T>, _, ctx| {
-                                this.on_drop(this.id, MovingElement::Before, ctx);
-                                ctx.notify();
-                            }));
-
-                        this.child(top_dropable_zone_element)
-                            .child(bottom_dropable_zone_element)
+                    .ml_12()
+                    .child(match element.clone() {
+                        Element::Text(element) => element.clone(),
                     })
                     .when_some(
                         match self
@@ -317,7 +284,6 @@ impl<T: Render> Render for DragElement<T> {
                             .drag_controller
                             .borrow()
                             .hovered_drop_zone
-                            .clone()
                         {
                             Some((i, MovingElement::After)) if i == self.id => Some(
                                 div()
@@ -342,5 +308,31 @@ impl<T: Render> Render for DragElement<T> {
                         |this, bar| this.child(bar),
                     ),
             )
+            .when(is_dragging, |this| {
+                let top_dropable_zone_element = div()
+                    .absolute()
+                    .tab_index(2)
+                    .w_full()
+                    .h_1_2()
+                    .top_0()
+                    .on_drop(ctx.listener(move |this, _: &Element, _, ctx| {
+                        this.on_drop(this.id, MovingElement::After, ctx);
+                        ctx.notify();
+                    }));
+
+                let bottom_dropable_zone_element = div()
+                    .absolute()
+                    .tab_index(2)
+                    .w_full()
+                    .h_1_2()
+                    .bottom_0()
+                    .on_drop(ctx.listener(move |this, _: &Element, _, ctx| {
+                        this.on_drop(this.id, MovingElement::Before, ctx);
+                        ctx.notify();
+                    }));
+
+                this.child(top_dropable_zone_element)
+                    .child(bottom_dropable_zone_element)
+            })
     }
 }

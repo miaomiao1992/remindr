@@ -1,6 +1,5 @@
 use gpui::{
     AppContext, Context, Entity, IntoElement, ParentElement, Pixels, Render, Styled, Window, div,
-    rgb,
 };
 use gpui_component::ActiveTheme;
 

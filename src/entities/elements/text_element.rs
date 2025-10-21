@@ -82,10 +82,11 @@ impl TextElement {
                     let text_element =
                         ctx.new(|ctx| TextElement::new(id, window, ctx, state.clone()));
 
-                    let element =
-                        ctx.new(|_ctx| DragElement::new(id, state.clone(), text_element.clone()));
+                    let element = ctx.new(|_ctx| {
+                        DragElement::new(id, state.clone(), Element::Text(text_element.clone()))
+                    });
 
-                    let node = ElementNode::with_id(id, Element::Text(element));
+                    let node = ElementNode::with_id(id, element);
 
                     {
                         let mut elements = elements_rc_clone.borrow_mut();
@@ -128,6 +129,7 @@ impl Render for TextElement {
                 TextInput::new(&self.input_state)
                     .bordered(false)
                     .bg(transparent_white())
+                    .text_lg()
                     .text_color(black()),
             )
     }
