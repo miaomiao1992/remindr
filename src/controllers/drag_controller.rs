@@ -1,7 +1,7 @@
 use gpui::{
     App, AppContext, Context, DragMoveEvent, Entity, InteractiveElement, IntoElement,
-    ParentElement, Render, StatefulInteractiveElement, Styled, Window, blue, div,
-    prelude::FluentBuilder, px,
+    ParentElement, Render, StatefulInteractiveElement, Styled, Window, div, prelude::FluentBuilder,
+    px,
 };
 use gpui_component::{ActiveTheme, Icon, IconName};
 use uuid::Uuid;
@@ -168,8 +168,7 @@ impl Render for DragElement {
             .flex()
             .justify_center()
             .items_center()
-            // .bg(ctx.theme().background)
-            .bg(blue())
+            .bg(ctx.theme().background)
             .relative()
             .on_drag_move(
                 ctx.listener(move |this, event: &DragMoveEvent<Element>, _, ctx| {

@@ -32,9 +32,8 @@ impl TextElement {
             move |this, input_state, ev: &InputEvent, window, ctx| match ev {
                 InputEvent::Change => {
                     let value = input_state.read(ctx).value();
-                    this.label = value;
 
-                    if this.label.is_empty() {
+                    if this.label.is_empty() && value.is_empty() {
                         let elements_rc_clone = state.read(ctx).elements.clone();
                         let index = {
                             let elements_guard = elements_rc_clone.borrow();
@@ -46,23 +45,24 @@ impl TextElement {
 
                         {
                             let mut elements = elements_rc_clone.borrow_mut();
-                            elements.remove(index);
+                            if elements.len() > 1 {
+                                elements.remove(index);
+
+                                let previous_element = elements.get(index.saturating_sub(1));
+                                if let Some(node) = previous_element {
+                                    match node.element.read(ctx).child.clone() {
+                                        Element::Text(element) => {
+                                            element.update(ctx, |this, ctx| {
+                                                this.focus(window, ctx);
+                                            });
+                                        }
+                                    }
+                                }
+                            }
                         }
-
-                        // {
-                        //     let elements_guard = elements_rc_clone.borrow();
-                        //     let previous_element = elements_guard.get(index.saturating_sub(1));
-
-                        //     if let Some(previous_element) = previous_element {
-                        //         match previous_element {
-                        //             Element::Text(element) => {
-                        //                 element.focus();
-                        //             }
-                        //             _ => {}
-                        //         }
-                        //     }
-                        // }
-                    };
+                    } else {
+                        this.label = value;
+                    }
 
                     ctx.notify()
                 }

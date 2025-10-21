@@ -51,10 +51,6 @@ impl Render for Document {
             .flex_1()
             .justify_center()
             .bg(ctx.theme().background.opacity(0.8))
-            .child(format!(
-                "-> {}",
-                controller.borrow().hovered_drop_zone.is_some(),
-            ))
             .child(
                 div()
                     .max_w(px(820.0))
