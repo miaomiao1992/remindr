@@ -7,7 +7,8 @@ use uuid::Uuid;
 use crate::{
     controllers::drag_controller::DragElement,
     entities::ui::elements::{
-        ElementNode, ElementNodeParser, RemindrElement, text::text_element::TextElement,
+        ElementNode, ElementNodeParser, RemindrElement, divider::divider_element::DividerElement,
+        text::text_element::TextElement,
     },
 };
 
@@ -48,6 +49,10 @@ impl DocumentParser {
             "text" => {
                 let element = cx.new(|cx| TextElement::parse(entry, window, cx).unwrap());
                 RemindrElement::Text(element)
+            }
+            "divider" => {
+                let element = cx.new(|cx| DividerElement::parse(entry, window, cx).unwrap());
+                RemindrElement::Divider(element)
             }
             _ => panic!("Unknown element type"),
         };

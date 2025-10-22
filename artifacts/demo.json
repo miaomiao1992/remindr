@@ -3,8 +3,12 @@
     "id": "019a08f1-6a3c-77e4-bfba-fc8a8458cc92",
     "type": "text",
     "metadata": {
-      "content": "Hello, World!"
+      "content": "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. "
     }
+  },
+  {
+    "id": "019a08f1-6a3c-77e4-bfba-fc8a8458cc84",
+    "type": "divider"
   },
   {
     "id": "019a08f1-6a3c-77e4-bfba-fc8a8458cc94",

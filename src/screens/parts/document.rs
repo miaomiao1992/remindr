@@ -17,7 +17,7 @@ impl Render for Document {
             .child(
                 div()
                     .max_w(px(820.0))
-                    .w_full()
+                    .w(px(820.0))
                     .on_drag_move(cx.listener(
                         move |_, event: &DragMoveEvent<RemindrElement>, _, cx| {
                             let state = cx.global_mut::<ViewState>().current.as_mut().unwrap();
@@ -35,13 +35,5 @@ impl Render for Document {
                             .map(|node| div().child(node.element.clone())),
                     ),
             )
-            .child(div().w_full().children(state.elements.iter().map(|node| {
-                div().child(format!(
-                    "-> {:?}",
-                    match node.element.read(cx).child.clone() {
-                        RemindrElement::Text(text) => text.read(cx).data.clone(),
-                    }
-                ))
-            })))
     }
 }

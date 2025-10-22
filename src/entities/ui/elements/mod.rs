@@ -1,24 +1,30 @@
 use anyhow::Error;
-use gpui::{App, AppContext, Context, Entity, IntoElement, Render, Window};
+use gpui::{AnyElement, App, AppContext, Context, Entity, IntoElement, Render, Window};
 use serde_json::Value;
 use uuid::Uuid;
 
 use crate::{
-    Utils, controllers::drag_controller::DragElement,
-    entities::ui::elements::text::text_element::TextElement,
+    Utils,
+    controllers::drag_controller::DragElement,
+    entities::ui::elements::{
+        divider::divider_element::DividerElement, text::text_element::TextElement,
+    },
 };
 
+pub mod divider;
 pub mod text;
 
 #[derive(Clone, Debug)]
 pub enum RemindrElement {
     Text(Entity<TextElement>),
+    Divider(Entity<DividerElement>),
 }
 
 impl Render for RemindrElement {
-    fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
-        match &self {
-            RemindrElement::Text(element) => element.clone(),
+    fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> AnyElement {
+        match self {
+            RemindrElement::Text(element) => element.clone().into_any_element(),
+            RemindrElement::Divider(element) => element.clone().into_any_element(),
         }
     }
 }
@@ -41,7 +47,7 @@ impl ElementNode {
     }
 }
 
-pub trait ElementNodeParser<T> {
+pub trait ElementNodeParser {
     fn parse(payload: &Value, window: &mut Window, cx: &mut Context<Self>) -> Result<Self, Error>
     where
         Self: Sized;

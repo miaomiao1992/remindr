@@ -1,7 +1,7 @@
 use gpui::{
-    App, AppContext, BorrowAppContext, Context, DragMoveEvent, Entity, InteractiveElement,
-    IntoElement, ParentElement, Render, StatefulInteractiveElement, Styled, Window, div,
-    prelude::FluentBuilder, px,
+    AnyEntity, App, AppContext, BorrowAppContext, Context, DragMoveEvent, Entity,
+    InteractiveElement, IntoElement, ParentElement, Render, StatefulInteractiveElement, Styled,
+    Window, div, prelude::FluentBuilder, px,
 };
 use gpui_component::{ActiveTheme, Icon, IconName};
 use uuid::Uuid;
@@ -169,9 +169,6 @@ impl Render for DragElement {
         div()
             .group("drag_element")
             .w_full()
-            .flex()
-            .justify_center()
-            .items_center()
             .bg(cx.theme().background)
             .relative()
             .on_drag_move(
@@ -269,8 +266,8 @@ impl Render for DragElement {
             .child(
                 div()
                     .relative()
-                    .flex_1()
                     .ml_12()
+                    .w_full()
                     .child(entity_child)
                     .when_some(
                         match hovered_drop_zone {

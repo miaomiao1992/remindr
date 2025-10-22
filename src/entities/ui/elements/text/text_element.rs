@@ -1,22 +1,20 @@
-use std::sync::Arc;
-
 use anyhow::{Error, Ok};
 use gpui::{
-    AppContext, BorrowAppContext, Context, Entity, IntoElement, ParentElement, Render,
-    SharedString, Styled, Subscription, Window, black, div, transparent_white,
+    AppContext, BorrowAppContext, Context, Entity, IntoElement, Render, SharedString, Styled,
+    Subscription, Window, transparent_white,
 };
-use gpui_component::input::{InputEvent, InputState, TextInput};
+use gpui_component::{
+    StyledExt,
+    input::{InputEvent, InputState, TextInput},
+};
 use serde::{Deserialize, Serialize};
-use serde_json::{Value, from_value, to_value};
+use serde_json::{Value, from_value};
 use uuid::Uuid;
 
 use crate::{
     Utils,
     controllers::drag_controller::DragElement,
-    entities::{
-        document_parser::DocumentParser,
-        ui::elements::{ElementNode, ElementNodeParser, RemindrElement},
-    },
+    entities::ui::elements::{ElementNode, ElementNodeParser, RemindrElement},
     states::document_state::ViewState,
 };
 
@@ -27,7 +25,7 @@ pub struct TextElement {
     _subscriptions: Vec<Subscription>,
 }
 
-impl ElementNodeParser<TextElement> for TextElement {
+impl ElementNodeParser for TextElement {
     fn parse(data: &Value, window: &mut Window, cx: &mut Context<Self>) -> Result<Self, Error> {
         let data = from_value::<TextElementData>(data.clone())?;
 
@@ -97,6 +95,7 @@ impl TextElement {
                                 RemindrElement::Text(element) => {
                                     element.update(cx, |this, cx| this.focus(window, cx));
                                 }
+                                _ => {}
                             }
                         }
                     }
@@ -143,18 +142,11 @@ impl TextElement {
 
 impl Render for TextElement {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        div()
-            .flex()
-            .items_center()
-            .text_color(black())
-            .text_xs()
-            .child(
-                TextInput::new(&self.input_state)
-                    .bordered(false)
-                    .bg(transparent_white())
-                    .text_lg()
-                    .text_color(black()),
-            )
+        TextInput::new(&self.input_state)
+            .bordered(false)
+            .bg(transparent_white())
+            .text_lg()
+            .whitespace_normal()
     }
 }
 
