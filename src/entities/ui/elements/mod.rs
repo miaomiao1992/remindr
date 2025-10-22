@@ -1,17 +1,16 @@
 use anyhow::Error;
-use gpui::{Context, Entity, IntoElement, Render, Window};
+use gpui::{App, AppContext, Context, Entity, IntoElement, Render, Window};
 use serde_json::Value;
 use uuid::Uuid;
 
 use crate::{
     Utils, controllers::drag_controller::DragElement,
     entities::ui::elements::text::text_element::TextElement,
-    screens::parts::document::DocumentState,
 };
 
 pub mod text;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum RemindrElement {
     Text(Entity<TextElement>),
 }
@@ -43,12 +42,7 @@ impl ElementNode {
 }
 
 pub trait ElementNodeParser<T> {
-    fn parse(
-        payload: Value,
-        window: &mut Window,
-        ctx: &mut Context<T>,
-        state: Entity<DocumentState>,
-    ) -> Result<Self, Error>
+    fn parse(payload: &Value, window: &mut Window, cx: &mut Context<Self>) -> Result<Self, Error>
     where
         Self: Sized;
 }

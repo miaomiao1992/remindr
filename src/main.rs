@@ -2,8 +2,8 @@ use std::borrow::Cow;
 
 use anyhow::anyhow;
 use gpui::*;
-use gpui_component::Root;
-use remindr::screens::main_screen::MainScreen;
+use gpui_component::{ActiveTheme, Root};
+use remindr::{screens::main_screen::MainScreen, states::document_state::ViewState};
 use rust_embed::RustEmbed;
 
 #[derive(RustEmbed)]
@@ -31,6 +31,7 @@ fn main() {
     app.run(move |cx| {
         gpui_component::init(cx);
 
+        cx.set_global::<ViewState>(ViewState::default());
         cx.activate(true);
 
         let mut window_size = size(px(640.), px(480.));

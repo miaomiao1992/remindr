@@ -1,12 +1,15 @@
 use gpui::{
-    App, AppContext, Context, DragMoveEvent, Entity, InteractiveElement, IntoElement,
-    ParentElement, Render, StatefulInteractiveElement, Styled, Window, div, prelude::FluentBuilder,
-    px,
+    App, AppContext, BorrowAppContext, Context, DragMoveEvent, Entity, InteractiveElement,
+    IntoElement, ParentElement, Render, StatefulInteractiveElement, Styled, Window, div,
+    prelude::FluentBuilder, px,
 };
 use gpui_component::{ActiveTheme, Icon, IconName};
 use uuid::Uuid;
 
-use crate::{entities::ui::elements::RemindrElement, screens::parts::document::DocumentState};
+use crate::{
+    entities::ui::elements::{RemindrElement, text::text_element::TextElement},
+    states::document_state::ViewState,
+};
 
 #[derive(Clone, PartialEq)]
 pub enum MovingElement {
@@ -122,41 +125,46 @@ impl DragController {
 pub struct DragElement {
     pub id: Uuid,
     pub child: RemindrElement,
-    pub state: Entity<DocumentState>,
 }
 
 impl DragElement {
-    pub fn new(id: Uuid, state: Entity<DocumentState>, child: RemindrElement) -> Self {
-        Self { id, child, state }
+    pub fn new(id: Uuid, child: RemindrElement) -> Self {
+        Self { id, child }
     }
 
-    fn on_drop(&self, id: Uuid, direction: MovingElement, ctx: &mut Context<Self>) {
-        let elements = self.state.read(ctx).elements.clone();
+    fn on_drop(&self, id: Uuid, direction: MovingElement, cx: &mut Context<Self>) {
+        cx.update_global::<ViewState, _>(|state, _| {
+            let state = state.current.as_mut().unwrap();
 
-        let controller = self.state.read(ctx).drag_controller.clone();
-        let from_id = controller.borrow().dragging_id.unwrap();
+            let from_id = state.drag_controller.dragging_id.unwrap();
+            let from_index = state.elements.iter().position(|e| e.id == from_id).unwrap();
+            let target_index = state.elements.iter().position(|e| e.id == id).unwrap();
 
-        let from_index = elements
-            .borrow()
-            .iter()
-            .position(|e| e.id == from_id)
-            .unwrap();
-
-        let target_index = elements.borrow().iter().position(|e| e.id == id).unwrap();
-
-        controller.borrow_mut().drop_element_by_index(
-            &mut elements.borrow_mut(),
-            from_index,
-            target_index,
-            direction,
-        );
+            state.drag_controller.drop_element_by_index(
+                &mut state.elements,
+                from_index,
+                target_index,
+                direction,
+            );
+        });
     }
 }
 
 impl Render for DragElement {
-    fn render(&mut self, _: &mut Window, ctx: &mut Context<Self>) -> impl IntoElement {
-        let element = self.child.clone();
-        let is_dragging = self.state.read(ctx).drag_controller.borrow().is_dragging;
+    fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let state = cx.global::<ViewState>();
+        let document_state_entity_ref = state.current.as_ref().unwrap();
+
+        let controller = document_state_entity_ref.drag_controller.clone();
+        let is_dragging = controller.is_dragging;
+        let hovered_drop_zone = controller.hovered_drop_zone.clone();
+
+        let child = self.child.clone();
+        // let element = cx.new(|_| match self.child.clone() {
+        //     RemindrElement::Text(element) => element,
+        // });
+
+        let entity_child = cx.new(|_| self.child.clone());
 
         div()
             .group("drag_element")
@@ -164,54 +172,52 @@ impl Render for DragElement {
             .flex()
             .justify_center()
             .items_center()
-            .bg(ctx.theme().background)
+            .bg(cx.theme().background)
             .relative()
-            .on_drag_move(ctx.listener(
-                move |this, event: &DragMoveEvent<RemindrElement>, _, ctx| {
-                    let controller = this.state.read(ctx).drag_controller.clone();
+            .on_drag_move(
+                cx.listener(move |this, event: &DragMoveEvent<RemindrElement>, _, cx| {
+                    cx.update_global::<ViewState, _>(|view_state, _| {
+                        let document_state_entity = view_state.current.as_mut().unwrap();
+                        let controller = &mut document_state_entity.drag_controller;
 
-                    let bounds = event.bounds;
-                    let middle_y = bounds.origin.y + bounds.size.height / 2.0;
-                    let mouse_y = event.event.position.y;
+                        let bounds = event.bounds;
+                        let middle_y = bounds.origin.y + bounds.size.height / 2.0;
+                        let mouse_y = event.event.position.y;
 
-                    let is_in_bounds = mouse_y >= bounds.origin.y
-                        && mouse_y <= bounds.origin.y + bounds.size.height;
+                        let is_in_bounds = mouse_y >= bounds.origin.y
+                            && mouse_y <= bounds.origin.y + bounds.size.height;
 
-                    if is_in_bounds {
-                        let zone = if mouse_y < middle_y {
-                            MovingElement::After
+                        if is_in_bounds {
+                            let zone = if mouse_y < middle_y {
+                                MovingElement::After
+                            } else {
+                                MovingElement::Before
+                            };
+
+                            if controller.hovered_drop_zone != Some((this.id, zone.clone())) {
+                                controller.hovered_drop_zone = Some((this.id, zone.clone()));
+                            }
                         } else {
-                            MovingElement::Before
-                        };
-
-                        if controller.borrow().hovered_drop_zone != Some((this.id, zone.clone())) {
-                            controller.borrow_mut().hovered_drop_zone =
-                                Some((this.id, zone.clone()));
-
-                            ctx.notify();
-                        }
-                    } else {
-                        let mut controller = controller.borrow_mut();
-                        if let Some((i, _)) = controller.hovered_drop_zone.clone() {
-                            if i == this.id {
-                                controller.hovered_drop_zone = None;
-                                ctx.notify();
+                            if let Some((i, _)) = controller.hovered_drop_zone.clone() {
+                                if i == this.id {
+                                    controller.hovered_drop_zone = None;
+                                }
                             }
                         }
-                    }
-                },
-            ))
+                    });
+                }),
+            )
             .on_mouse_down(
                 gpui::MouseButton::Left,
-                ctx.listener(move |this, _, _, ctx| {
-                    {
-                        let mut controller = this.state.read(ctx).drag_controller.borrow_mut();
+                cx.listener(move |this, _, _, cx| {
+                    cx.update_global::<ViewState, _>(|state, _| {
+                        let controller = &mut state.current.as_mut().unwrap().drag_controller;
 
                         controller.dragging_id = Some(this.id);
                         controller.is_dragging = true;
-                    }
+                    });
 
-                    ctx.notify();
+                    cx.notify();
                 }),
             )
             .child(
@@ -226,16 +232,14 @@ impl Render for DragElement {
                         div()
                             .id("add_button")
                             .size_6()
-                            .hover(|this| {
-                                this.bg(ctx.theme().background.opacity(0.3)).cursor_grab()
-                            })
+                            .hover(|this| this.bg(cx.theme().background.opacity(0.3)).cursor_grab())
                             .flex()
                             .justify_center()
                             .items_center()
                             .child(
                                 Icon::new(IconName::Plus)
                                     .size_5()
-                                    .text_color(ctx.theme().accent_foreground.opacity(0.5)),
+                                    .text_color(cx.theme().accent_foreground.opacity(0.5)),
                             )
                             .when(is_dragging, |this| this.cursor_move()),
                     )
@@ -243,9 +247,7 @@ impl Render for DragElement {
                         div()
                             .id("drag_button")
                             .size_6()
-                            .hover(|this| {
-                                this.bg(ctx.theme().background.opacity(0.3)).cursor_grab()
-                            })
+                            .hover(|this| this.bg(cx.theme().background.opacity(0.3)).cursor_grab())
                             .flex()
                             .justify_center()
                             .items_center()
@@ -253,11 +255,11 @@ impl Render for DragElement {
                                 Icon::default()
                                     .path("icons/grip-vertical.svg")
                                     .size_5()
-                                    .text_color(ctx.theme().accent_foreground.opacity(0.5)),
+                                    .text_color(cx.theme().accent_foreground.opacity(0.5)),
                             )
                             .when(is_dragging, |this| this.cursor_move())
                             .on_drag(
-                                element.clone(),
+                                child.clone(),
                                 move |element, _, _window: &mut Window, cx: &mut App| {
                                     cx.new(|_| element.clone())
                                 },
@@ -269,24 +271,16 @@ impl Render for DragElement {
                     .relative()
                     .flex_1()
                     .ml_12()
-                    .child(match element.clone() {
-                        RemindrElement::Text(element) => element.clone(),
-                    })
+                    .child(entity_child)
                     .when_some(
-                        match self
-                            .state
-                            .read(ctx)
-                            .drag_controller
-                            .borrow()
-                            .hovered_drop_zone
-                        {
+                        match hovered_drop_zone {
                             Some((i, MovingElement::After)) if i == self.id => Some(
                                 div()
                                     .absolute()
                                     .top(px(-2.0))
                                     .h(px(4.0))
                                     .w_full()
-                                    .bg(ctx.theme().accent_foreground.opacity(0.5))
+                                    .bg(cx.theme().accent_foreground.opacity(0.5))
                                     .tab_index(10),
                             ),
                             Some((i, MovingElement::Before)) if i == self.id => Some(
@@ -295,7 +289,7 @@ impl Render for DragElement {
                                     .bottom(px(-2.0))
                                     .h(px(4.0))
                                     .w_full()
-                                    .bg(ctx.theme().accent_foreground.opacity(0.5))
+                                    .bg(cx.theme().accent_foreground.opacity(0.5))
                                     .tab_index(10),
                             ),
                             _ => None,
@@ -310,9 +304,9 @@ impl Render for DragElement {
                     .w_full()
                     .h_1_2()
                     .top_0()
-                    .on_drop(ctx.listener(move |this, _: &RemindrElement, _, ctx| {
-                        this.on_drop(this.id, MovingElement::After, ctx);
-                        ctx.notify();
+                    .on_drop(cx.listener(move |this, _: &RemindrElement, _, cx| {
+                        this.on_drop(this.id, MovingElement::After, cx);
+                        cx.notify();
                     }));
 
                 let bottom_dropable_zone_element = div()
@@ -321,9 +315,9 @@ impl Render for DragElement {
                     .w_full()
                     .h_1_2()
                     .bottom_0()
-                    .on_drop(ctx.listener(move |this, _: &RemindrElement, _, ctx| {
-                        this.on_drop(this.id, MovingElement::Before, ctx);
-                        ctx.notify();
+                    .on_drop(cx.listener(move |this, _: &RemindrElement, _, cx| {
+                        this.on_drop(this.id, MovingElement::Before, cx);
+                        cx.notify();
                     }));
 
                 this.child(top_dropable_zone_element)

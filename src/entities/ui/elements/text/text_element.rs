@@ -1,20 +1,26 @@
-use anyhow::Error;
+use std::sync::Arc;
+
+use anyhow::{Error, Ok};
 use gpui::{
-    AppContext, Context, Entity, IntoElement, ParentElement, Render, SharedString, Styled,
-    Subscription, Window, black, div, transparent_white,
+    AppContext, BorrowAppContext, Context, Entity, IntoElement, ParentElement, Render,
+    SharedString, Styled, Subscription, Window, black, div, transparent_white,
 };
 use gpui_component::input::{InputEvent, InputState, TextInput};
 use serde::{Deserialize, Serialize};
-use serde_json::{Value, from_value};
+use serde_json::{Value, from_value, to_value};
 use uuid::Uuid;
 
 use crate::{
     Utils,
     controllers::drag_controller::DragElement,
-    entities::ui::elements::{ElementNode, ElementNodeParser, RemindrElement},
-    screens::parts::document::DocumentState,
+    entities::{
+        document_parser::DocumentParser,
+        ui::elements::{ElementNode, ElementNodeParser, RemindrElement},
+    },
+    states::document_state::ViewState,
 };
 
+#[derive(Debug)]
 pub struct TextElement {
     pub data: TextElementData,
     input_state: Entity<InputState>,
@@ -22,141 +28,110 @@ pub struct TextElement {
 }
 
 impl ElementNodeParser<TextElement> for TextElement {
-    fn parse(
-        data: Value,
-        window: &mut Window,
-        cx: &mut Context<Self>,
-        state: Entity<DocumentState>,
-    ) -> Result<Self, Error> {
-        let data = from_value::<TextElementData>(data)?;
-        let input_state =
-            cx.new(|cx| InputState::new(window, cx).default_value(data.metadata.content.clone()));
-        let subscriber = Self::prepare_subscribers(&input_state, state.clone(), window, cx);
+    fn parse(data: &Value, window: &mut Window, cx: &mut Context<Self>) -> Result<Self, Error> {
+        let data = from_value::<TextElementData>(data.clone())?;
+
+        let (input_state, _subscriptions) = Self::init(data.metadata.content.clone(), window, cx);
 
         Ok(Self {
             data,
             input_state,
-            _subscriptions: vec![subscriber],
+            _subscriptions,
         })
     }
 }
 
 impl TextElement {
-    pub fn new(
-        id: Uuid,
-        window: &mut Window,
-        cx: &mut Context<Self>,
-        state: Entity<DocumentState>,
-    ) -> Self {
-        let input_state = cx.new(|cx| InputState::new(window, cx));
-        let subscriber = Self::prepare_subscribers(&input_state, state.clone(), window, cx);
+    pub fn new(id: Uuid, window: &mut Window, cx: &mut Context<Self>) -> Result<Self, Error> {
+        let content = SharedString::new("");
+        let (input_state, _subscriptions) = Self::init(content.clone(), window, cx);
 
-        let _subscriptions = vec![subscriber];
-
-        Self {
+        Ok(Self {
             data: TextElementData {
                 id,
-                metadata: Metadata::default(),
+                metadata: Metadata { content },
             },
             input_state,
             _subscriptions,
-        }
-    }
-
-    fn prepare_subscribers(
-        input_state: &Entity<InputState>,
-        state: Entity<DocumentState>,
-        window: &Window,
-        cx: &mut Context<Self>,
-    ) -> Subscription {
-        cx.subscribe_in(&input_state, window, {
-            move |this, input_state, ev: &InputEvent, window, cx| match ev {
-                InputEvent::Change => {
-                    Self::on_change(&mut this.data, input_state, &state, window, cx)
-                }
-                InputEvent::PressEnter { .. } => {
-                    Self::on_press_enter(&this.data, &state, window, cx)
-                }
-                _ => {}
-            }
         })
     }
 
-    fn on_change(
-        data: &mut TextElementData,
-        input_state: &Entity<InputState>,
-        state: &Entity<DocumentState>,
+    fn init(
+        content: SharedString,
         window: &mut Window,
         cx: &mut Context<Self>,
-    ) {
-        let value = input_state.read(cx).value();
+    ) -> (Entity<InputState>, Vec<Subscription>) {
+        let input_state = cx.new(|cx| InputState::new(window, cx).default_value(content));
 
-        if data.metadata.content.is_empty() && value.is_empty() {
-            let elements_rc_clone = state.read(cx).elements.clone();
-            let index = {
-                let elements_guard = elements_rc_clone.borrow();
-                elements_guard
-                    .iter()
-                    .position(|e| e.id == data.id)
-                    .unwrap_or_default()
-            };
+        let _subscriptions = vec![cx.subscribe_in(&input_state, window, {
+            move |this, _, ev: &InputEvent, window, cx| match ev {
+                InputEvent::Change => this.on_change(window, cx),
+                InputEvent::PressEnter { .. } => this.on_press_enter(window, cx),
+                _ => {}
+            }
+        })];
 
-            {
-                let mut elements = elements_rc_clone.borrow_mut();
-                if elements.len() > 1 {
-                    elements.remove(index);
+        (input_state, _subscriptions)
+    }
 
-                    let previous_element = elements.get(index.saturating_sub(1));
-                    if let Some(node) = previous_element {
-                        match node.element.read(cx).child.clone() {
-                            RemindrElement::Text(element) => {
-                                element.update(cx, |this, cx| {
-                                    this.focus(window, cx);
-                                });
+    fn on_change(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let input_state = self.input_state.read(cx);
+
+        if self.data.metadata.content.is_empty() && input_state.value().is_empty() {
+            cx.update_global::<ViewState, _>(|view_state, cx| {
+                if let Some(current_doc_state) = view_state.current.as_mut() {
+                    let elements_rc_clone = &mut current_doc_state.elements;
+                    let index = {
+                        elements_rc_clone
+                            .iter()
+                            .position(|e| e.id == self.data.id)
+                            .unwrap_or_default()
+                    };
+
+                    if elements_rc_clone.len() > 1 {
+                        elements_rc_clone.remove(index);
+
+                        let previous_element = elements_rc_clone.get(index.saturating_sub(1));
+                        if let Some(node) = previous_element {
+                            match node.element.read(cx).child.clone() {
+                                RemindrElement::Text(element) => {
+                                    element.update(cx, |this, cx| this.focus(window, cx));
+                                }
                             }
                         }
                     }
                 }
-            }
+            });
         } else {
-            data.metadata.content = value;
+            self.data.metadata.content = input_state.value();
         }
-
-        cx.notify()
     }
 
-    fn on_press_enter(
-        data: &TextElementData,
-        state: &Entity<DocumentState>,
-        window: &mut Window,
-        cx: &mut Context<Self>,
-    ) {
+    fn on_press_enter(&self, window: &mut Window, cx: &mut Context<Self>) {
         let id = Utils::generate_uuid();
-        let elements_rc_clone = state.read(cx).elements.clone();
+        let state = cx.global::<ViewState>().current.as_ref().unwrap();
 
-        let insertion_index = {
-            let elements_guard = elements_rc_clone.borrow();
-            elements_guard
-                .iter()
-                .position(|e| e.id == data.id)
-                .map(|idx| idx + 1)
-                .unwrap_or_default()
-        };
+        let insertion_index = state
+            .elements
+            .iter()
+            .position(|e| e.id == self.data.id)
+            .map(|idx| idx + 1)
+            .unwrap_or_default();
 
-        let text_element = cx.new(|cx| TextElement::new(id, window, cx, state.clone()));
-
+        let text_element = cx.new(|cx| TextElement::new(id, window, cx).unwrap());
         let element = RemindrElement::Text(text_element.clone());
-        let element = cx.new(|_| DragElement::new(id, state.clone(), element));
-        let node = ElementNode::with_id(id, element);
+        let drag_element = cx.new(|_| DragElement::new(id, element));
+        let element_node = ElementNode::with_id(id, drag_element);
 
-        {
-            let mut elements = elements_rc_clone.borrow_mut();
-            elements.insert(insertion_index, node);
-        }
-
-        text_element.update(cx, |this, cx| {
-            this.focus(window, cx);
+        cx.update_global::<ViewState, _>(|this, _| {
+            this.current
+                .as_mut()
+                .unwrap()
+                .elements
+                .insert(insertion_index, element_node);
         });
+
+        text_element.update(cx, |this, cx| this.focus(window, cx));
     }
 
     pub fn focus(&self, window: &mut Window, cx: &mut Context<Self>) {
@@ -167,7 +142,7 @@ impl TextElement {
 }
 
 impl Render for TextElement {
-    fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         div()
             .flex()
             .items_center()

@@ -4,6 +4,7 @@ use uuid::{NoContext, Timestamp, Uuid};
 pub mod controllers;
 pub mod entities;
 pub mod screens;
+pub mod states;
 
 pub struct Utils;
 
