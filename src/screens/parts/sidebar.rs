@@ -1,0 +1,58 @@
+use std::vec;
+
+use gpui::{AppContext, Context, IntoElement, ParentElement, Pixels, Render, Styled, Window, div};
+use gpui_component::{
+    ActiveTheme, Collapsible, Icon, IconName, IndexPath, Side, Sizable, Size,
+    divider::Divider,
+    dropdown::{Dropdown, DropdownDelegate, DropdownState},
+    sidebar::{Sidebar, SidebarFooter, SidebarGroup, SidebarHeader, SidebarMenu, SidebarMenuItem},
+};
+
+pub struct MenuSidebar;
+
+impl Render for MenuSidebar {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let links = vec![
+            SidebarMenuItem::new("Chercher").icon(IconName::Search),
+            SidebarMenuItem::new("Accueil").icon(Icon::default().path("icons/house.svg")),
+            SidebarMenuItem::new("Boite de réception").icon(IconName::Inbox),
+        ];
+
+        let documents = vec![
+            SidebarMenuItem::new("Document 1")
+                .icon(IconName::File)
+                .active(true),
+            SidebarMenuItem::new("Document 2").icon(IconName::File),
+            SidebarMenuItem::new("Document 3").icon(IconName::File),
+        ];
+
+        let dropdown = cx.new(|cx: &mut Context<DropdownState<Vec<String>>>| {
+            DropdownState::new(
+                vec!["John Doe".into(), "Orange".into(), "Banana".into()],
+                Some(IndexPath::default()), // Select first item
+                window,
+                cx,
+            )
+        });
+
+        Sidebar::left()
+            .width(Pixels::from(240.0))
+            .header(
+                SidebarHeader::new().child(
+                    Dropdown::new(&dropdown)
+                        .appearance(false)
+                        .with_size(Size::Small),
+                ),
+            )
+            .child(
+                SidebarGroup::new("Label")
+                    .child(SidebarMenu::new().children(links))
+                    .collapsed(true),
+            )
+            .child(
+                SidebarGroup::new("Documents")
+                    .child(SidebarMenu::new().children(documents).collapsed(false)),
+            )
+            .footer(SidebarFooter::new().child("Footer"))
+    }
+}

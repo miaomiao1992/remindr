@@ -1,23 +1,11 @@
 use anyhow::{Error, Ok};
-use gpui::{
-    AppContext, BorrowAppContext, Context, Entity, IntoElement, Render, SharedString, Styled,
-    Subscription, Window, transparent_white,
-};
-use gpui_component::{
-    StyledExt,
-    divider::Divider,
-    input::{InputEvent, InputState, TextInput},
-};
+use gpui::{Context, IntoElement, ParentElement, Render, Styled, Window, div};
+use gpui_component::divider::Divider;
 use serde::{Deserialize, Serialize};
-use serde_json::{Value, from_value};
+use serde_json::Value;
 use uuid::Uuid;
 
-use crate::{
-    Utils,
-    controllers::drag_controller::DragElement,
-    entities::ui::elements::{ElementNode, ElementNodeParser, RemindrElement},
-    states::document_state::ViewState,
-};
+use crate::entities::ui::elements::ElementNodeParser;
 
 #[derive(Debug)]
 pub struct DividerElement;
@@ -30,7 +18,7 @@ impl ElementNodeParser for DividerElement {
 
 impl Render for DividerElement {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        Divider::horizontal().my_3()
+        div().py_5().child(Divider::horizontal())
     }
 }
 

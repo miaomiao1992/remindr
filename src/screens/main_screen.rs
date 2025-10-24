@@ -9,7 +9,7 @@ use gpui_component::ActiveTheme;
 use crate::{
     controllers::drag_controller::{DragController, DragElement},
     entities::{document_parser::DocumentParser, ui::elements::ElementNode},
-    screens::parts::document::Document,
+    screens::parts::{document::Document, sidebar::MenuSidebar},
     states::document_state::{DocumentState, ViewState},
 };
 
@@ -53,7 +53,7 @@ impl Render for MainScreen {
             .w_full()
             .h_full()
             .flex()
-            .child(div().w(Pixels::from(240.0)).bg(cx.theme().accent))
+            .child(div().bg(cx.theme().accent).child(cx.new(|_| MenuSidebar)))
             .child(self.document.clone())
     }
 }

@@ -1,7 +1,9 @@
+use std::f64::INFINITY;
+
 use anyhow::{Error, Ok};
 use gpui::{
-    AppContext, BorrowAppContext, Context, Entity, IntoElement, Render, SharedString, Styled,
-    Subscription, Window, transparent_white,
+    AppContext, BorrowAppContext, Context, Entity, IntoElement, ParentElement, Render,
+    SharedString, Styled, Subscription, Window, div, prelude::FluentBuilder, transparent_white,
 };
 use gpui_component::{
     StyledExt,
@@ -59,7 +61,12 @@ impl TextElement {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> (Entity<InputState>, Vec<Subscription>) {
-        let input_state = cx.new(|cx| InputState::new(window, cx).default_value(content));
+        let input_state = cx.new(|cx| {
+            InputState::new(window, cx)
+                .default_value(content)
+                .auto_grow(1, INFINITY as usize)
+                .soft_wrap(true)
+        });
 
         let _subscriptions = vec![cx.subscribe_in(&input_state, window, {
             move |this, _, ev: &InputEvent, window, cx| match ev {
@@ -141,12 +148,12 @@ impl TextElement {
 }
 
 impl Render for TextElement {
-    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        TextInput::new(&self.input_state)
-            .bordered(false)
-            .bg(transparent_white())
-            .text_lg()
-            .whitespace_normal()
+    fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        div().w_full().child(
+            TextInput::new(&self.input_state)
+                .bordered(false)
+                .bg(transparent_white()),
+        )
     }
 }
 
