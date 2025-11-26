@@ -3,7 +3,7 @@ use std::borrow::Cow;
 use anyhow::anyhow;
 use gpui::*;
 use gpui_component::Root;
-use remindr_gpui::{screens::main_screen::MainScreen, states::document_state::ViewState};
+use remindr_gpui::{screens::AppRouter, states::document_state::DocumentState};
 use rust_embed::RustEmbed;
 
 #[derive(RustEmbed)]
@@ -30,8 +30,12 @@ fn main() {
 
     app.run(move |cx| {
         gpui_component::init(cx);
+        gpui_router::init(cx);
 
-        cx.set_global::<ViewState>(ViewState::default());
+        cx.set_global(DocumentState {
+            documents: Vec::new(),
+        });
+
         cx.activate(true);
 
         let mut window_size = size(px(640.), px(480.));
@@ -55,8 +59,8 @@ fn main() {
 
             let window = cx
                 .open_window(options, |window, cx| {
-                    let view = cx.new(|cx| MainScreen::new(window, cx));
-                    cx.new(|cx| Root::new(view.into(), window, cx))
+                    let view = cx.new(|cx| AppRouter::new(window, cx));
+                    cx.new(|cx| Root::new(view, window, cx))
                 })
                 .expect("failed to open window");
 
