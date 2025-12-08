@@ -5,12 +5,20 @@ use uuid::Uuid;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HeadingNodeData {
     pub id: Uuid,
+
+    #[serde(rename = "type")]
+    pub node_type: String,
+
     pub metadata: HeadingMetadata,
 }
 
 impl HeadingNodeData {
-    pub fn new(id: Uuid, metadata: HeadingMetadata) -> Self {
-        Self { id, metadata }
+    pub fn new(id: Uuid, node_type: String, metadata: HeadingMetadata) -> Self {
+        Self {
+            id,
+            node_type,
+            metadata,
+        }
     }
 }
 

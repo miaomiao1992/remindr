@@ -8,6 +8,7 @@ use crate::{entities::nodes::divider::data::DividerNodeData, states::node_state:
 
 pub struct DividerNode {
     pub id: Uuid,
+    pub data: DividerNodeData,
     pub state: Option<Entity<NodeState>>,
 }
 
@@ -17,6 +18,7 @@ impl DividerNode {
 
         Ok(Self {
             id: data.id,
+            data,
             state: None,
         })
     }

@@ -139,7 +139,12 @@ impl HeadingNode {
 
         self.state.update(cx, |state, cx| {
             let id = Utils::generate_uuid();
-            let data = to_value(TextNodeData::new(id, TextMetadata::default())).unwrap();
+            let data = to_value(TextNodeData::new(
+                id,
+                "text".to_string(),
+                TextMetadata::default(),
+            ))
+            .unwrap();
 
             let element = cx.new(|cx| TextNode::parse(&data, &self.state, window, cx).unwrap());
             element.update(cx, |this, cx| {

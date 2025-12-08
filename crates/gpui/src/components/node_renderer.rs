@@ -1,17 +1,18 @@
 use gpui::{prelude::FluentBuilder, *};
-use gpui_component::{ActiveTheme, Icon, IconName, StyledExt};
+use gpui_component::{ActiveTheme, Icon, IconName};
 use serde_json::Value;
 use uuid::Uuid;
 
 use crate::{
-    entities::nodes::{NodePayload, RemindrElement, node::RemindrNode, text::data::TextMetadata},
+    entities::nodes::{NodePayload, RemindrElement, text::data::TextMetadata},
     states::node_state::{MovingElement, NodeState},
 };
 
 pub struct NodeRenderer {
-    state: Entity<NodeState>,
+    pub state: Entity<NodeState>,
 }
 
+#[derive(Clone)]
 pub struct DraggableInfo {
     pub id: Uuid,
 }
@@ -96,11 +97,19 @@ impl NodeRenderer {
 
 impl Render for NodeRenderer {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let state = self.state.read(cx);
-        let nodes = state.get_nodes().clone();
+        let background_color = cx.theme().background;
+        let nodes = {
+            let state = self.state.read(cx);
+            state.get_nodes().clone()
+        };
+
+        let (is_dragging, hovered_drop_zone) = {
+            let state = self.state.read(cx);
+            (state.is_dragging.clone(), state.hovered_drop_zone.clone())
+        };
 
         let children = nodes.into_iter().map(|node| {
-            let node_drag_info = DraggableInfo {
+            let draggable_info = DraggableInfo {
                 id: node.id.clone(),
             };
 
@@ -140,9 +149,8 @@ impl Render for NodeRenderer {
                             div()
                                 .id(node.id)
                                 .size_6()
-                                .hover(|this| {
-                                    this.bg(cx.theme().background.opacity(0.3)).cursor_grab()
-                                })
+                                .hover(|this| this.bg(cx.theme().background.opacity(0.3)))
+                                .cursor_pointer()
                                 .flex()
                                 .justify_center()
                                 .items_center()
@@ -152,8 +160,10 @@ impl Render for NodeRenderer {
                                         .size_5()
                                         .text_color(cx.theme().accent_foreground.opacity(0.5)),
                                 )
-                                .when(state.dragging_id.is_some(), |this| this.cursor_move())
-                                .on_drag(node_drag_info, {
+                                .when(self.state.read(cx).dragging_id.is_some(), |this| {
+                                    this.cursor_move()
+                                })
+                                .on_drag(draggable_info, {
                                     let state = self.state.clone();
                                     move |element, _, _window: &mut Window, cx: &mut App| {
                                         state.update(cx, |state, _| state.start_drag(element.id));
@@ -170,7 +180,7 @@ impl Render for NodeRenderer {
                         .child(node.element.clone())
                         .tab_index(0)
                         .when_some(
-                            match state.hovered_drop_zone {
+                            match hovered_drop_zone {
                                 Some((i, MovingElement::After)) if i == node.id => Some(
                                     div()
                                         .absolute()
@@ -194,7 +204,7 @@ impl Render for NodeRenderer {
                             |this, bar| this.child(bar),
                         ),
                 )
-                .when(state.is_dragging, |this| {
+                .when(is_dragging, |this| {
                     let top_dropable_zone_element = div()
                         .absolute()
                         .tab_index(2)
@@ -226,7 +236,7 @@ impl Render for NodeRenderer {
 
         div()
             .size_full()
-            .bg(cx.theme().background)
+            .bg(background_color)
             .children(children)
             .child(
                 div()

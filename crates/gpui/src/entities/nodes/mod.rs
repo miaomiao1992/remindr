@@ -46,7 +46,8 @@ impl RemindrElement {
 
         let node = match payload {
             NodePayload::Heading((payload, is_focus)) => {
-                let data = to_value(HeadingNodeData::new(id, payload)).unwrap();
+                let data =
+                    to_value(HeadingNodeData::new(id, "heading".to_string(), payload)).unwrap();
 
                 let element = cx.new(|cx| HeadingNode::parse(&data, &state, window, cx).unwrap());
                 if is_focus {
@@ -58,7 +59,7 @@ impl RemindrElement {
                 RemindrElement::Heading(element)
             }
             NodePayload::Text((payload, is_focus)) => {
-                let data = to_value(TextNodeData::new(id, payload)).unwrap();
+                let data = to_value(TextNodeData::new(id, "text".to_string(), payload)).unwrap();
 
                 let element = cx.new(|cx| TextNode::parse(&data, &state, window, cx).unwrap());
                 if is_focus {
@@ -70,7 +71,7 @@ impl RemindrElement {
                 RemindrElement::Text(element)
             }
             NodePayload::Divider => {
-                let data = to_value(DividerNodeData { id }).unwrap();
+                let data = to_value(DividerNodeData::new(id, "divider".to_string())).unwrap();
                 let element = cx.new(|cx| DividerNode::parse(&data, window, cx).unwrap());
 
                 RemindrElement::Divider(element)
