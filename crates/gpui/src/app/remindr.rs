@@ -36,8 +36,7 @@ impl Remindr {
                 .with_context(|| format!("Failed to create {:?}", config_path))?;
 
             let settings_file = config_path.join("settings.json");
-
-            let settings = Settings {};
+            let settings = Settings::default();
 
             write(&settings_file, to_string(&settings).unwrap())
                 .await
@@ -47,6 +46,19 @@ impl Remindr {
         }
 
         Ok(())
+    }
+
+    pub async fn init_default_database(&self) -> Result<PathBuf, Error> {
+        let config_path = self.get_config_dir("remindr")?;
+        let database_path = config_path.join("database.sqlite");
+
+        if !database_path.exists() {
+            write(&database_path, "")
+                .await
+                .with_context(|| format!("Failed to create {:?}", database_path))?;
+        }
+
+        Ok(database_path)
     }
 
     pub async fn load_settings(&self) -> Result<Settings, Error> {

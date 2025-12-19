@@ -4,21 +4,34 @@ use gpui_component::{
     button::{Button, ButtonVariants},
     tab::{Tab, TabBar},
 };
+use gpui_nav::{Screen, ScreenContext};
 
 use crate::app::{
     components::node_code_renderer::NodeCodeRenderer,
-    states::document_state::{Document, DocumentState},
+    states::{
+        app_state::AppState,
+        document_state::{Document, DocumentState},
+    },
 };
 
 pub struct DocumentScreen {
+    _ctx: ScreenContext<AppState>,
+
     current_index: usize,
     current_document: Option<Document>,
     show_code: bool,
 }
 
+impl Screen for DocumentScreen {
+    fn id(&self) -> &'static str {
+        "Documents"
+    }
+}
+
 impl DocumentScreen {
-    pub fn new(_: &mut Context<Self>) -> Self {
+    pub fn new(app_state: WeakEntity<AppState>) -> Self {
         Self {
+            _ctx: ScreenContext::new(app_state),
             current_index: 0,
             current_document: None,
             show_code: false,
@@ -67,12 +80,13 @@ impl Render for DocumentScreen {
                                     .tooltip("Close tab")
                                     .on_click({
                                         let element_id = element.uid.clone();
-                                        move |_, _, cx| {
+                                        cx.listener(move |_, _, _, cx| {
                                             let element_id = element_id.clone();
-                                            cx.update_global::<DocumentState, _>(|state, _| {
+                                            cx.update_global::<DocumentState, _>(|state, cx| {
                                                 state.remove_document(element_id);
+                                                cx.notify();
                                             })
-                                        }
+                                        })
                                     }),
                             )
                         })),
