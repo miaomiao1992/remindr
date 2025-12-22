@@ -70,6 +70,7 @@ async fn main() -> Result<(), Error> {
 
         cx.set_global(DocumentState {
             documents: Vec::new(),
+            current_document: None,
         });
 
         cx.activate(true);

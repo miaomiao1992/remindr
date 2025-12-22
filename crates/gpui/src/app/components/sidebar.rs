@@ -68,22 +68,34 @@ impl Render for AppSidebar {
 
                     SidebarMenuItem::new(document.title.clone())
                         .icon(IconName::File)
-                        .on_click(cx.listener(move |this, _, window, cx| {
-                            cx.update_global::<DocumentState, _>(|state, cx| {
-                                state.add_document(
-                                    document_id.clone(),
-                                    document_content.clone(),
-                                    window,
-                                    cx,
-                                );
-                            });
+                        .on_click(cx.listener({
+                            let document_id = document_id.clone();
+                            move |this, _, window, cx| {
+                                cx.update_global::<DocumentState, _>(|state, cx| {
+                                    state.add_document_and_focus(
+                                        document_id.clone(),
+                                        document_content.clone(),
+                                        window,
+                                        cx,
+                                    );
+                                });
 
-                            this.app_state.update(cx, |app_state, cx| {
-                                let document_screen = DocumentScreen::new(cx.weak_entity());
-                                app_state.navigator.push(document_screen, cx);
-                            });
+                                this.app_state.update(cx, |app_state, cx| {
+                                    let document_screen = DocumentScreen::new(cx.weak_entity());
+                                    app_state.navigator.push(document_screen, cx);
+                                });
+                            }
                         }))
-                        .active(true)
+                        .active(cx.read_global::<DocumentState, _>({
+                            let document_id = document_id.clone();
+                            move |state, _| {
+                                if let Some(current_document) = state.current_document.clone() {
+                                    current_document.uid == document_id
+                                } else {
+                                    false
+                                }
+                            }
+                        }))
                 })
                 .collect()
         } else {

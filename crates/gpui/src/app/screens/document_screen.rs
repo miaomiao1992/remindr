@@ -8,17 +8,12 @@ use gpui_nav::{Screen, ScreenContext};
 
 use crate::app::{
     components::node_code_renderer::NodeCodeRenderer,
-    states::{
-        app_state::AppState,
-        document_state::{Document, DocumentState},
-    },
+    states::{app_state::AppState, document_state::DocumentState},
 };
 
 pub struct DocumentScreen {
     _ctx: ScreenContext<AppState>,
 
-    current_index: usize,
-    current_document: Option<Document>,
     show_code: bool,
 }
 
@@ -32,8 +27,6 @@ impl DocumentScreen {
     pub fn new(app_state: WeakEntity<AppState>) -> Self {
         Self {
             _ctx: ScreenContext::new(app_state),
-            current_index: 0,
-            current_document: None,
             show_code: false,
         }
     }
@@ -46,27 +39,29 @@ impl DocumentScreen {
 
 impl Render for DocumentScreen {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let documents = cx.read_global::<DocumentState, _>(|state, _| {
-            state.documents.clone().into_iter().collect::<Vec<_>>()
-        });
+        let (documents, current_document, current_index) =
+            cx.read_global::<DocumentState, _>(|state, _| {
+                let documents = state.documents.clone().into_iter().collect::<Vec<_>>();
+                let current_document = state.current_document.clone();
+                let current_index = state.get_current_document_index();
 
-        if self.current_document.is_none() {
-            self.current_document = documents.get(0).cloned();
-        }
+                (documents, current_document, current_index)
+            });
 
         div()
             .w_full()
             .when(!documents.is_empty(), |this| {
                 this.child(
                     TabBar::new("tabs")
-                        .selected_index(self.current_index)
-                        .on_click(cx.listener(|this, index: &usize, _, cx| {
+                        .selected_index(current_index.unwrap_or(0))
+                        .on_click(cx.listener(|_, index: &usize, _, cx| {
                             let documents = cx.read_global::<DocumentState, _>(|state, _| {
                                 state.documents.clone().into_iter().collect::<Vec<_>>()
                             });
 
-                            this.current_index = *index;
-                            this.current_document = documents.get(*index).cloned();
+                            cx.update_global::<DocumentState, _>(|state, cx| {
+                                state.current_document = documents.get(*index).cloned();
+                            });
 
                             cx.notify();
                         }))
@@ -83,7 +78,12 @@ impl Render for DocumentScreen {
                                         cx.listener(move |_, _, _, cx| {
                                             let element_id = element_id.clone();
                                             cx.update_global::<DocumentState, _>(|state, cx| {
+                                                let previous_document =
+                                                    state.get_previous_document(element_id.clone());
+
+                                                state.current_document = previous_document;
                                                 state.remove_document(element_id);
+
                                                 cx.notify();
                                             })
                                         })
@@ -123,12 +123,12 @@ impl Render for DocumentScreen {
                                 .w_full()
                                 .mx_auto()
                                 .py_5()
-                                .when_some(self.current_document.clone(), |this, element| {
+                                .when_some(current_document.clone(), |this, element| {
                                     this.child(element.renderer.clone())
                                 }),
                         )
                         .when(self.show_code, |this| {
-                            let nodes = self.current_document.clone().map(|document| {
+                            let nodes = current_document.clone().map(|document| {
                                 document
                                     .renderer
                                     .read(cx)
@@ -144,9 +144,7 @@ impl Render for DocumentScreen {
                         }),
                 )
             })
-            .when_none(&self.current_document, |this| {
-                this.p_10().child(DocumentStateEmpty)
-            })
+            .when_none(&current_document, |this| this.child(DocumentStateEmpty))
     }
 }
 
