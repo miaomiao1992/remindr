@@ -1,12 +1,18 @@
 use std::borrow::Cow;
 
-use anyhow::anyhow;
+use anyhow::Error;
 use gpui::*;
 use gpui_component::{Root, theme};
-use remindr_gpui::app::{
-    remindr::Remindr, screens::AppRouter, states::document_state::DocumentState,
+use remindr_gpui::{
+    app::{
+        remindr::Remindr,
+        screens::AppRouter,
+        states::{document_state::DocumentState, repository_state::RepositoryState},
+    },
+    infrastructure::repositories::document_repository::DocumentRepository,
 };
 use rust_embed::RustEmbed;
+use sqlx::{SqlitePool, migrate};
 
 #[derive(RustEmbed)]
 #[folder = "./assets"]
@@ -17,7 +23,7 @@ impl AssetSource for Assets {
     fn load(&self, path: &str) -> Result<Option<Cow<'static, [u8]>>> {
         Self::get(path)
             .map(|f| Some(f.data))
-            .ok_or_else(|| anyhow!("could not find asset at path \"{path}\""))
+            .ok_or_else(|| Error::msg("could not find asset at path \"{path}\""))
     }
 
     fn list(&self, path: &str) -> Result<Vec<SharedString>> {
@@ -28,11 +34,26 @@ impl AssetSource for Assets {
 }
 
 #[tokio::main]
-async fn main() {
+async fn main() -> Result<(), Error> {
     let app = Application::new().with_assets(Assets);
     let remindr = Remindr::new();
 
     let settings = remindr.load_settings().await;
+
+    let _ = remindr.init().await;
+    let database_path = remindr.init_default_database().await;
+
+    let pool = if let Ok(database_path) = database_path {
+        let database_url = format!("sqlite://{}", database_path.to_str().unwrap());
+        SqlitePool::connect(&database_url).await?
+    } else {
+        panic!("Failed to initialize database");
+    };
+
+    migrate!("./migrations")
+        .run(&pool)
+        .await
+        .map_err(|err| Error::msg(err.to_string()))?;
 
     app.run(move |cx| {
         gpui_component::init(cx);
@@ -43,8 +64,13 @@ async fn main() {
             cx.set_global(settings);
         }
 
+        cx.set_global(RepositoryState {
+            documents: DocumentRepository::new(pool),
+        });
+
         cx.set_global(DocumentState {
             documents: Vec::new(),
+            current_document: None,
         });
 
         cx.activate(true);
@@ -58,8 +84,6 @@ async fn main() {
         let window_bounds = Bounds::centered(None, window_size, cx);
 
         cx.spawn(async move |cx| {
-            let _ = remindr.init().await;
-
             let options = WindowOptions {
                 window_bounds: Some(WindowBounds::Windowed(window_bounds)),
                 window_min_size: Some(gpui::Size {
@@ -72,7 +96,7 @@ async fn main() {
 
             let window = cx
                 .open_window(options, |window, cx| {
-                    let view = cx.new(|cx| AppRouter::new(window, cx));
+                    let view = cx.new(AppRouter::new);
                     cx.new(|cx| Root::new(view, window, cx))
                 })
                 .expect("failed to open window");
@@ -88,4 +112,6 @@ async fn main() {
         })
         .detach();
     });
+
+    Ok(())
 }

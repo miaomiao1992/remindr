@@ -1,10 +1,23 @@
 use gpui::*;
+use gpui_nav::{Screen, ScreenContext};
 
-pub struct HomeScreen {}
+use crate::app::states::app_state::AppState;
+
+pub struct HomeScreen {
+    _ctx: ScreenContext<AppState>,
+}
+
+impl Screen for HomeScreen {
+    fn id(&self) -> &'static str {
+        "home"
+    }
+}
 
 impl HomeScreen {
-    pub fn new(_: &mut Context<Self>) -> Self {
-        Self {}
+    pub fn new(app_state: WeakEntity<AppState>) -> Self {
+        Self {
+            _ctx: ScreenContext::new(app_state),
+        }
     }
 }
 

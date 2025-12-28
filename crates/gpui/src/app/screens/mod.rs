@@ -1,11 +1,8 @@
-use gpui::{AppContext, Context, Entity, IntoElement, ParentElement, Render, Styled, Window, div};
-use gpui_router::{Route, Routes};
+use gpui::*;
+use gpui_component::ActiveTheme;
 
 use crate::app::{
-    components::layout::Layout,
-    screens::{
-        document_screen::DocumentScreen, home_screen::HomeScreen, login_screen::LoginScreen,
-    },
+    components::sidebar::AppSidebar, screens::home_screen::HomeScreen, states::app_state::AppState,
 };
 
 pub mod document_screen;
@@ -13,49 +10,39 @@ pub mod home_screen;
 pub mod login_screen;
 
 pub struct AppRouter {
-    login_screen: Entity<LoginScreen>,
-    home_screen: Entity<HomeScreen>,
-    document_screen: Entity<DocumentScreen>,
+    app_state: Entity<AppState>,
+    sidebar: Entity<AppSidebar>,
 }
 
 impl AppRouter {
-    pub fn new(_: &mut Window, cx: &mut Context<Self>) -> Self {
-        let login_screen = cx.new(|cx| LoginScreen::new(cx));
-        let home_screen = cx.new(|cx| HomeScreen::new(cx));
-        let document_screen = cx.new(|cx| DocumentScreen::new(cx));
+    pub fn new(cx: &mut Context<Self>) -> Self {
+        let app_state = cx.new(|cx| {
+            let mut state = AppState::new();
+            let home = HomeScreen::new(cx.weak_entity());
+            state.navigator.push(home, cx);
+            state
+        });
 
         Self {
-            login_screen,
-            home_screen,
-            document_screen,
+            app_state: app_state.clone(),
+            sidebar: AppSidebar::new(app_state, cx),
         }
     }
 }
 
 impl Render for AppRouter {
-    fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
-        div().w_full().h_full().child(
-            Routes::new()
-                .child(
-                    Route::new()
-                        .path("login")
-                        .element(self.login_screen.clone()),
-                )
-                .child(
-                    Route::new()
-                        .layout(Layout::new())
-                        .child(Route::new().index().element(self.home_screen.clone()))
-                        .child(
-                            Route::new()
-                                .path("documents")
-                                .element(self.document_screen.clone()),
-                        )
-                        .child(
-                            Route::new()
-                                .path("{*not_match}")
-                                .element(div().child("Not found")),
-                        ),
-                ),
-        )
+    fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        div()
+            .w_full()
+            .h_full()
+            .flex()
+            .child(div().bg(cx.theme().accent).child(self.sidebar.clone()))
+            .child(
+                if let Some(current_view) = self.app_state.read(cx).navigator.current() {
+                    current_view.clone()
+                } else {
+                    AnyView::from(cx.new(|_| EmptyView))
+                },
+            )
     }
 }

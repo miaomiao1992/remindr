@@ -2,7 +2,8 @@ use chrono::Utc;
 use uuid::{NoContext, Timestamp, Uuid};
 
 pub mod app;
-pub mod inrastructure;
+pub mod domain;
+pub mod infrastructure;
 
 pub struct Utils;
 

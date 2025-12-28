@@ -1,53 +1,111 @@
-use std::{fs::read_to_string, vec};
-
 use gpui::*;
 use gpui_component::{
     Collapsible, Icon, IconName,
     sidebar::{Sidebar, SidebarFooter, SidebarGroup, SidebarHeader, SidebarMenu, SidebarMenuItem},
 };
-use gpui_router::use_navigate;
-use serde_json::{Value, from_str};
+use smol::block_on;
 
-use crate::app::states::document_state::DocumentState;
+use crate::{
+    app::{
+        screens::{document_screen::DocumentScreen, home_screen::HomeScreen},
+        states::{
+            app_state::AppState, document_state::DocumentState, repository_state::RepositoryState,
+        },
+    },
+    domain::database::document::Document,
+};
 
-#[derive(IntoElement)]
-pub struct AppSidebar;
+pub struct AppSidebar {
+    documents: Option<Vec<Document>>,
+    app_state: Entity<AppState>,
+}
 
-impl RenderOnce for AppSidebar {
-    fn render(self, _: &mut Window, _: &mut App) -> impl IntoElement {
+impl AppSidebar {
+    pub fn new(app_state: Entity<AppState>, cx: &mut App) -> Entity<Self> {
+        cx.new(|cx| {
+            let mut this = Self {
+                documents: None,
+                app_state,
+            };
+
+            this.fetch_documents(cx);
+            this
+        })
+    }
+
+    fn fetch_documents(&mut self, cx: &mut App) {
+        let document_repository =
+            cx.read_global::<RepositoryState, _>(|repositories, _| repositories.documents.clone());
+
+        let documents = block_on(async move { document_repository.get_documents().await });
+        if let Ok(documents) = documents {
+            self.documents = Some(documents);
+        }
+    }
+}
+
+impl Render for AppSidebar {
+    fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let links = vec![
             SidebarMenuItem::new("Chercher").icon(IconName::Search),
             SidebarMenuItem::new("Accueil")
                 .icon(Icon::default().path("icons/house.svg"))
-                .on_click(|_, _, cx| {
-                    let mut navigate = use_navigate(cx);
-                    navigate(SharedString::new("/"));
-                }),
+                .on_click(cx.listener(|this, _, _, cx| {
+                    this.app_state.update(cx, |app_state, cx| {
+                        let home_screen = HomeScreen::new(cx.weak_entity());
+                        app_state.navigator.push(home_screen, cx);
+                    });
+                })),
             SidebarMenuItem::new("Boite de réception").icon(IconName::Inbox),
         ];
 
-        let documents = vec![
-            SidebarMenuItem::new("Document 1")
-                .icon(IconName::File)
-                .on_click(|_, window, cx| {
-                    cx.update_global::<DocumentState, _>(|state, cx| {
-                        let path = "./artifacts/demo.json";
-                        let content = read_to_string(path).unwrap();
-                        let nodes = from_str::<Vec<Value>>(&content).unwrap();
+        let documents = if let Some(documents) = &self.documents {
+            documents
+                .into_iter()
+                .map(|document| {
+                    let document_id = document.id.to_string();
+                    let document_title = document.title.clone();
+                    let document_content = document.content.as_array().unwrap().clone();
 
-                        state.add_document(path, nodes, window, cx);
-                    });
+                    SidebarMenuItem::new(document_title.clone())
+                        .icon(IconName::File)
+                        .on_click(cx.listener({
+                            let document_id = document_id.clone();
+                            move |this, _, window, cx| {
+                                cx.update_global::<DocumentState, _>(|state, cx| {
+                                    state.add_document_and_focus(
+                                        document_id.clone(),
+                                        document_title.clone(),
+                                        document_content.clone(),
+                                        window,
+                                        cx,
+                                    );
+                                });
 
-                    let mut navigate = use_navigate(cx);
-                    navigate(SharedString::new("/documents"));
+                                this.app_state.update(cx, |app_state, cx| {
+                                    let document_screen = DocumentScreen::new(cx.weak_entity());
+                                    app_state.navigator.push(document_screen, cx);
+                                });
+                            }
+                        }))
+                        .active(cx.read_global::<DocumentState, _>({
+                            let document_id = document_id.clone();
+                            move |state, _| {
+                                if let Some(current_document) = state.current_document.clone() {
+                                    current_document.uid == document_id
+                                } else {
+                                    false
+                                }
+                            }
+                        }))
                 })
-                .active(true),
-            SidebarMenuItem::new("Document 2").icon(IconName::File),
-            SidebarMenuItem::new("Document 3").icon(IconName::File),
-        ];
+                .collect()
+        } else {
+            vec![]
+        };
 
         Sidebar::left()
-            .width(Pixels::from(240.0))
+            .w(Pixels::from(240.0))
             .header(SidebarHeader::new())
             .child(
                 SidebarGroup::new("Label")
