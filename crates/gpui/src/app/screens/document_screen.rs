@@ -66,7 +66,7 @@ impl Render for DocumentScreen {
                             cx.notify();
                         }))
                         .children(documents.iter().map(|element| {
-                            Tab::new().label(element.uid.clone()).suffix(
+                            Tab::new().label(element.title.clone()).suffix(
                                 Button::new("btn")
                                     .xsmall()
                                     .mr_2()

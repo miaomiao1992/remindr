@@ -6,6 +6,7 @@ use crate::app::components::node_renderer::NodeRenderer;
 #[derive(Clone)]
 pub struct Document {
     pub uid: String,
+    pub title: String,
     pub renderer: Entity<NodeRenderer>,
 }
 
@@ -42,6 +43,7 @@ impl DocumentState {
     pub fn add_document(
         &mut self,
         uid: String,
+        title: String,
         nodes: Vec<Value>,
         window: &mut Window,
         cx: &mut App,
@@ -51,6 +53,7 @@ impl DocumentState {
             let renderer = NodeRenderer::new(nodes, window, cx);
             self.documents.push(Document {
                 uid,
+                title,
                 renderer: cx.new(|_| renderer),
             });
         }
@@ -59,11 +62,12 @@ impl DocumentState {
     pub fn add_document_and_focus(
         &mut self,
         uid: String,
+        title: String,
         nodes: Vec<Value>,
         window: &mut Window,
         cx: &mut App,
     ) {
-        self.add_document(uid.clone(), nodes, window, cx);
+        self.add_document(uid.clone(), title.clone(), nodes, window, cx);
         self.current_document = self
             .documents
             .clone()

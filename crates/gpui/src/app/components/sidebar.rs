@@ -64,9 +64,10 @@ impl Render for AppSidebar {
                 .into_iter()
                 .map(|document| {
                     let document_id = document.id.to_string();
+                    let document_title = document.title.clone();
                     let document_content = document.content.as_array().unwrap().clone();
 
-                    SidebarMenuItem::new(document.title.clone())
+                    SidebarMenuItem::new(document_title.clone())
                         .icon(IconName::File)
                         .on_click(cx.listener({
                             let document_id = document_id.clone();
@@ -74,6 +75,7 @@ impl Render for AppSidebar {
                                 cx.update_global::<DocumentState, _>(|state, cx| {
                                     state.add_document_and_focus(
                                         document_id.clone(),
+                                        document_title.clone(),
                                         document_content.clone(),
                                         window,
                                         cx,
