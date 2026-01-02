@@ -222,7 +222,7 @@ impl SlashMenu {
     ) -> impl IntoElement {
         let is_selected = self.selected_index == visual_index;
         let bg_color = if is_selected {
-            cx.theme().accent
+            cx.theme().accent.opacity(0.5)
         } else {
             cx.theme().transparent
         };

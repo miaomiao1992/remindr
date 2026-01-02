@@ -12,6 +12,7 @@ use crate::{
             nodes::{
                 element::RemindrElement,
                 heading::data::HeadingNodeData,
+                menu_provider::{NodeMenuItem, NodeMenuProvider},
                 node::RemindrNode,
                 text::{
                     data::{TextMetadata, TextNodeData},
@@ -194,6 +195,52 @@ impl HeadingNode {
                 cx,
             );
         });
+    }
+
+    pub fn set_level(&mut self, level: u32, window: &mut Window, cx: &mut Context<Self>) {
+        self.data.metadata.level = level;
+        cx.update_global::<crate::app::states::document_state::DocumentState, _>(|state, app| {
+            state.mark_changed(window, app);
+        });
+        cx.notify();
+    }
+}
+
+impl NodeMenuProvider for HeadingNode {
+    fn menu_items(&self, _cx: &App) -> Vec<NodeMenuItem> {
+        let node_id = self.data.id;
+
+        let levels: Vec<(u32, &'static str)> =
+            vec![(2, "icons/heading-2.svg"), (3, "icons/heading-3.svg")];
+
+        levels
+            .into_iter()
+            .map(|(level, icon)| {
+                NodeMenuItem::new(
+                    format!("heading-level-{}", level),
+                    format!("Heading {}", level),
+                    icon,
+                    move |state, window, cx| {
+                        let heading_entity = {
+                            let node = state.read(cx).get_current_nodes(node_id);
+                            node.and_then(|n| {
+                                if let RemindrElement::Heading(heading) = &n.element {
+                                    Some(heading.clone())
+                                } else {
+                                    None
+                                }
+                            })
+                        };
+
+                        if let Some(heading) = heading_entity {
+                            heading.update(cx, |this, cx| {
+                                this.set_level(level, window, cx);
+                            });
+                        }
+                    },
+                )
+            })
+            .collect()
     }
 }
 

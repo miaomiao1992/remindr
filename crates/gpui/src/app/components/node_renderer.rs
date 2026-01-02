@@ -5,6 +5,7 @@ use uuid::Uuid;
 
 use crate::app::{
     components::{
+        node_config_menu::NodeConfigMenu,
         nodes::{
             element::{NodePayload, RemindrElement},
             text::data::TextMetadata,
@@ -17,6 +18,7 @@ use crate::app::{
 pub struct NodeRenderer {
     pub state: Entity<NodeState>,
     insert_menu: Entity<SlashMenu>,
+    config_menus: Vec<Entity<NodeConfigMenu>>,
 }
 
 #[derive(Clone)]
@@ -39,7 +41,29 @@ impl NodeRenderer {
             SlashMenu::new(Uuid::nil(), &state, window, cx).with_mode(SlashMenuMode::InsertAfter)
         });
 
-        Self { state, insert_menu }
+        Self {
+            state,
+            insert_menu,
+            config_menus: Vec::new(),
+        }
+    }
+
+    fn get_or_create_config_menu(
+        &mut self,
+        node_id: Uuid,
+        cx: &mut Context<Self>,
+    ) -> Entity<NodeConfigMenu> {
+        if let Some(menu) = self
+            .config_menus
+            .iter()
+            .find(|m| m.read(cx).related_id == node_id)
+        {
+            return menu.clone();
+        }
+
+        let menu = cx.new(|cx| NodeConfigMenu::new(node_id, &self.state, cx));
+        self.config_menus.push(menu.clone());
+        menu
     }
 
     fn open_insert_menu(&mut self, node_id: Uuid, window: &mut Window, cx: &mut Context<Self>) {
@@ -126,10 +150,6 @@ impl Render for NodeRenderer {
         };
 
         let children = nodes.into_iter().map(|node| {
-            let draggable_info = DraggableInfo {
-                id: node.id.clone(),
-            };
-
             div()
                 .group("drag_element")
                 .on_drag_move(cx.listener(
@@ -173,32 +193,7 @@ impl Render for NodeRenderer {
                                 }))
                                 .when(show_menu_here, |el| el.child(self.insert_menu.clone()))
                         })
-                        .child(
-                            div()
-                                .id(node.id)
-                                .size_6()
-                                .hover(|this| this.bg(cx.theme().background.opacity(0.3)))
-                                .cursor_pointer()
-                                .flex()
-                                .justify_center()
-                                .items_center()
-                                .child(
-                                    Icon::default()
-                                        .path("icons/grip-vertical.svg")
-                                        .size_5()
-                                        .text_color(cx.theme().accent_foreground.opacity(0.5)),
-                                )
-                                .when(self.state.read(cx).dragging_id.is_some(), |this| {
-                                    this.cursor_move()
-                                })
-                                .on_drag(draggable_info, {
-                                    let state = self.state.clone();
-                                    move |element, _, _window: &mut Window, cx: &mut App| {
-                                        state.update(cx, |state, _| state.start_drag(element.id));
-                                        cx.new(|_| EmptyView)
-                                    }
-                                }),
-                        ),
+                        .child(self.get_or_create_config_menu(node.id, cx)),
                 )
                 .child(
                     div()

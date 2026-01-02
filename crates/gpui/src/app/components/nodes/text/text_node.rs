@@ -9,6 +9,7 @@ use crate::app::{
     components::{
         nodes::{
             element::{NodePayload, RemindrElement},
+            menu_provider::{NodeMenuItem, NodeMenuProvider},
             text::data::{TextMetadata, TextNodeData},
         },
         slash_menu::{SlashMenu, SlashMenuDismissEvent},
@@ -173,6 +174,12 @@ impl TextNode {
                 cx,
             );
         });
+    }
+}
+
+impl NodeMenuProvider for TextNode {
+    fn menu_items(&self, _cx: &App) -> Vec<NodeMenuItem> {
+        vec![]
     }
 }
 

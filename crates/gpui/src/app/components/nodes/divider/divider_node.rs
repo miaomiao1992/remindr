@@ -1,11 +1,15 @@
 use anyhow::{Error, Ok};
-use gpui::{Context, Entity, IntoElement, ParentElement, Render, Styled, Window, div};
+use gpui::{App, Context, Entity, IntoElement, ParentElement, Render, Styled, Window, div};
 use gpui_component::divider::Divider;
 use serde_json::{Value, from_value};
 use uuid::Uuid;
 
 use crate::app::{
-    components::nodes::divider::data::DividerNodeData, states::node_state::NodeState,
+    components::nodes::{
+        divider::data::DividerNodeData,
+        menu_provider::{NodeMenuItem, NodeMenuProvider},
+    },
+    states::node_state::NodeState,
 };
 
 pub struct DividerNode {
@@ -23,6 +27,12 @@ impl DividerNode {
             data,
             state: None,
         })
+    }
+}
+
+impl NodeMenuProvider for DividerNode {
+    fn menu_items(&self, _cx: &App) -> Vec<NodeMenuItem> {
+        vec![]
     }
 }
 

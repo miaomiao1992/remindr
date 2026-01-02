@@ -7,6 +7,7 @@ use crate::{
                 data::{HeadingMetadata, HeadingNodeData},
                 heading_node::HeadingNode,
             },
+            menu_provider::{NodeMenuItem, NodeMenuProvider},
             node::RemindrNode,
             text::{
                 data::{TextMetadata, TextNodeData},
@@ -38,6 +39,14 @@ impl RemindrElement {
             RemindrElement::Text(text) => to_value(text.read(cx).data.clone()).unwrap(),
             RemindrElement::Divider(divider) => to_value(divider.read(cx).data.clone()).unwrap(),
             RemindrElement::Heading(heading) => to_value(heading.read(cx).data.clone()).unwrap(),
+        }
+    }
+
+    pub fn menu_items(&self, cx: &App) -> Vec<NodeMenuItem> {
+        match self {
+            RemindrElement::Text(text) => text.read(cx).menu_items(cx),
+            RemindrElement::Divider(divider) => divider.read(cx).menu_items(cx),
+            RemindrElement::Heading(heading) => heading.read(cx).menu_items(cx),
         }
     }
 
