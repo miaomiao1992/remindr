@@ -49,14 +49,16 @@ impl Render for AppRouter {
                 div()
                     .flex_1()
                     .flex()
+                    .min_h_0()
+                    .overflow_hidden()
                     .child(div().bg(cx.theme().accent).child(self.sidebar.clone()))
-                    .child(
+                    .child(div().flex_1().min_w_0().overflow_hidden().child(
                         if let Some(current_view) = self.app_state.read(cx).navigator.current() {
                             current_view.clone()
                         } else {
                             AnyView::from(cx.new(|_| EmptyView))
                         },
-                    ),
+                    )),
             )
             .children(dialog_layer)
             .children(notification_layer)

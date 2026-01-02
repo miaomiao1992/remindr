@@ -260,7 +260,7 @@ impl Render for NodeRenderer {
                 })
         });
 
-        div().size_full().children(children).child(
+        div().w_full().children(children).child(
             div()
                 .id("add_element")
                 .cursor_pointer()

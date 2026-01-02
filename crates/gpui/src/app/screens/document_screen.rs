@@ -350,11 +350,13 @@ impl RenderOnce for DocumentStateLoaded {
             .flex_col()
             .h_full()
             .w_full()
+            .overflow_hidden()
             .child(
                 div()
                     .flex()
                     .gap_10()
                     .flex_1()
+                    .min_h_0()
                     .overflow_y_scrollbar()
                     .child(
                         div()
