@@ -3,6 +3,14 @@ name = "remindr_gpui"
 version.workspace = true
 edition.workspace = true
 
+[package.metadata.bundle]
+name = "Remindr"
+identifier = "com.leadcode.remindr"
+icon = ["assets/icons/remindr1024x1024@2x.png"]
+category = "public.app-category.productivity"
+short_description = "A self-hostable alternative to Notion"
+copyright = "Copyright (c) Baptiste Parmantier 2025. All rights reserved."
+
 [dependencies]
 anyhow = "1.0.100"
 chrono = "0.4.42"
