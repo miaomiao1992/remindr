@@ -53,11 +53,29 @@ impl DocumentScreen {
     }
 
     fn load_document_if_needed(&self, window: &mut Window, cx: &mut Context<Self>) {
-        let (needs_loading, document_id) = cx.read_global::<DocumentState, _>(|state, _| {
-            let id = state.current_opened_document;
-            let needs = id.map(|id| state.needs_loading(id)).unwrap_or(false);
-            (needs, id)
-        });
+        let (needs_loading, document_id, is_stuck) =
+            cx.read_global::<DocumentState, _>(|state, _| {
+                let id = state.current_opened_document;
+                let needs = id.map(|id| state.needs_loading(id)).unwrap_or(false);
+                // Check if document is stuck in loading state (loading_in_progress but still Loading)
+                let is_stuck = id
+                    .and_then(|id| state.documents.iter().find(|d| d.uid == id))
+                    .map(|doc| {
+                        doc.loading_in_progress && matches!(doc.state, LoadingState::Loading)
+                    })
+                    .unwrap_or(false);
+                (needs, id, is_stuck)
+            });
+
+        // Reset stuck loading state - this handles cases where the async task failed silently
+        if is_stuck {
+            if let Some(doc_id) = document_id {
+                cx.update_global::<DocumentState, _>(|state, _| {
+                    state.set_loading_in_progress(doc_id, false);
+                });
+            }
+            return; // Will trigger a reload on the next render cycle
+        }
 
         if needs_loading {
             if let Some(doc_id) = document_id {
@@ -87,15 +105,12 @@ impl DocumentScreen {
                                 });
                             });
 
-                            // If window update failed, try to update via cx.update
+                            // If window update failed, reset loading state so it can retry
                             if update_result.is_err() {
                                 let _ = cx.update(|cx| {
                                     cx.update_global::<DocumentState, _>(|state, _| {
                                         state.set_loading_in_progress(doc_id, false);
-                                        state.set_document_error(
-                                            doc_id,
-                                            "Failed to update window".to_string(),
-                                        );
+                                        // Don't set error - just reset so it can retry on next render
                                     });
                                 });
                             }
