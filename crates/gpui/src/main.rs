@@ -42,6 +42,43 @@ impl AssetSource for Assets {
 
 actions!(window, [Quit]);
 
+const MIN_WINDOW_SIZE: Size<Pixels> = Size {
+    width: px(640.),
+    height: px(480.),
+};
+
+fn create_window_options(bounds: Bounds<Pixels>) -> WindowOptions {
+    WindowOptions {
+        window_bounds: Some(WindowBounds::Windowed(bounds)),
+        window_min_size: Some(MIN_WINDOW_SIZE),
+        kind: WindowKind::Normal,
+        titlebar: Some(TitlebarOptions {
+            appears_transparent: true,
+            title: Some("Remindr".into()),
+            traffic_light_position: Some(point(px(9.0), px(9.0))),
+        }),
+        ..Default::default()
+    }
+}
+
+fn compute_window_bounds(cx: &App) -> Bounds<Pixels> {
+    let mut window_size = size(MIN_WINDOW_SIZE.width, MIN_WINDOW_SIZE.height);
+    if let Some(display) = cx.primary_display() {
+        let display_size = display.bounds().size;
+        window_size.width = display_size.width * 0.85;
+        window_size.height = display_size.height * 0.85;
+    }
+    Bounds::centered(None, window_size, cx)
+}
+
+fn open_main_window(cx: &mut App) -> anyhow::Result<WindowHandle<Root>> {
+    let bounds = compute_window_bounds(cx);
+    cx.open_window(create_window_options(bounds), |window, cx| {
+        let view = cx.new(AppRouter::new);
+        cx.new(|cx| Root::new(view, window, cx))
+    })
+}
+
 #[tokio::main]
 async fn main() -> Result<(), Error> {
     let app = Application::new().with_assets(Assets);
@@ -63,6 +100,18 @@ async fn main() -> Result<(), Error> {
         .run(&pool)
         .await
         .map_err(|err| Error::msg(err.to_string()))?;
+
+    app.on_reopen(|cx| {
+        if let Some(window) = cx.active_window() {
+            window
+                .update(cx, |_, window, _cx| {
+                    window.activate_window();
+                })
+                .ok();
+        } else {
+            open_main_window(cx).ok();
+        }
+    });
 
     app.run(move |cx| {
         gpui_component::init(cx);
@@ -96,49 +145,14 @@ async fn main() -> Result<(), Error> {
         cx.set_global(DocumentState::default());
         cx.activate(true);
 
-        let mut window_size = size(px(640.), px(480.));
-        if let Some(display) = cx.primary_display() {
-            let display_size = display.bounds().size;
-            window_size.width = display_size.width * 0.85;
-            window_size.height = display_size.height * 0.85;
-        }
-        let window_bounds = Bounds::centered(None, window_size, cx);
-
-        cx.spawn(async move |cx| {
-            let options = WindowOptions {
-                window_bounds: Some(WindowBounds::Windowed(window_bounds)),
-                window_min_size: Some(gpui::Size {
-                    width: px(640.),
-                    height: px(480.),
-                }),
-                kind: WindowKind::Normal,
-                titlebar: Some(TitlebarOptions {
-                    appears_transparent: true,
-                    title: Some("Remindr".into()),
-                    traffic_light_position: Some(point(px(9.0), px(9.0))),
-                }),
-                ..Default::default()
-            };
-
-            let window = cx
-                .open_window(options, |window, cx| {
-                    let view = cx.new(AppRouter::new);
-                    cx.new(|cx| Root::new(view, window, cx))
-                })
-                .expect("failed to open window");
-
-            window
-                .update(cx, |_, window, cx| {
-                    window.activate_window();
-                    window.set_window_title("Remindr");
-                    // Apply theme after window is created
-                    apply_theme(window, cx);
-                })
-                .expect("failed to update window");
-
-            Ok::<_, anyhow::Error>(())
-        })
-        .detach();
+        let window = open_main_window(cx).expect("failed to open window");
+        window
+            .update(cx, |_, window, cx| {
+                window.activate_window();
+                window.set_window_title("Remindr");
+                apply_theme(window, cx);
+            })
+            .expect("failed to update window");
 
         set_app_menus(cx);
         cx.on_action(|_: &Quit, cx| cx.quit());
