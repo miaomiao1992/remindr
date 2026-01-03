@@ -6,7 +6,7 @@ use gpui_component::{
     avatar::Avatar,
     button::{Button, ButtonVariants},
     h_flex,
-    menu::{DropdownMenu, PopupMenuItem},
+    menu::{DropdownMenu as _, PopupMenuItem},
     sidebar::SidebarHeader,
     v_flex,
 };
@@ -47,12 +47,12 @@ impl AppSidebar {
             })
             .detach();
 
-            // Poll every 1 seconds
+            // Poll every 5 seconds
             cx.spawn({
                 let repository = document_repository.clone();
                 async move |this, cx| {
                     loop {
-                        smol::Timer::after(Duration::from_secs(1)).await;
+                        smol::Timer::after(Duration::from_secs(5)).await;
                         let documents = repository.get_documents().await;
                         if let Ok(documents) = documents {
                             let result = this.update(cx, |state: &mut Self, _| {
@@ -110,15 +110,15 @@ impl AppSidebar {
                             .text_color(sidebar_fg.opacity(0.6)),
                     ),
             )
-        // .dropdown_menu(|menu, _, _| {
-        //     menu.item(
-        //         PopupMenuItem::new("Settings")
-        //             .icon(Icon::new(IconName::Settings))
-        //             .on_click(|_, _, _| {
-        //                 // TODO: Open settings
-        //             }),
-        //     )
-        // })
+            .dropdown_menu(|menu, _, _| {
+                menu.item(
+                    PopupMenuItem::new("Settings")
+                        .icon(Icon::new(IconName::Settings))
+                        .on_click(|_, _, _| {
+                            // TODO: Open settings
+                        }),
+                )
+            })
     }
 }
 

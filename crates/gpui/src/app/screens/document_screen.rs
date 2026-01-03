@@ -75,8 +75,14 @@ impl DocumentScreen {
                     match result {
                         Ok(document) => {
                             let update_result = cx.update_window(window_handle, |_, window, cx| {
-                                cx.update_global::<DocumentState, _>(|state, cx| {
-                                    state.set_document_content(doc_id, document, window, cx);
+                                // Create the document content outside of update_global
+                                let content = DocumentState::create_document_content(
+                                    doc_id, &document, window, cx,
+                                );
+
+                                // Then update the global state
+                                cx.update_global::<DocumentState, _>(|state, _| {
+                                    state.apply_document_content(doc_id, content);
                                     state.set_loading_in_progress(doc_id, false);
                                 });
                             });

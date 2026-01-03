@@ -148,7 +148,52 @@ impl DocumentState {
         self.current_opened_document = Some(id);
     }
 
-    /// Set the loaded content for a document
+    /// Create document content (entities) - call this outside of update_global
+    pub fn create_document_content(
+        uid: i32,
+        document: &DocumentModel,
+        window: &mut Window,
+        cx: &mut App,
+    ) -> DocumentContent {
+        let nodes = document
+            .content
+            .as_array()
+            .map(|arr| arr.clone())
+            .unwrap_or_default();
+
+        let renderer = NodeRenderer::new(nodes.clone(), window, cx);
+        let renderer = cx.new(|_| renderer);
+
+        // Create title input state
+        let title = document.title.clone();
+        let title_input = cx.new(|cx| {
+            let mut state = InputState::new(window, cx).placeholder("Untitled");
+
+            state.set_value(title, window, cx);
+            state
+        });
+
+        // Create the title handler to manage Enter key events
+        let title_handler = cx.new(|cx| {
+            TitleInputHandler::new(uid, title_input.clone(), renderer.clone(), window, cx)
+        });
+
+        DocumentContent {
+            nodes,
+            renderer,
+            title_input,
+            _title_handler: title_handler,
+        }
+    }
+
+    /// Apply pre-created document content to a document
+    pub fn apply_document_content(&mut self, uid: i32, content: DocumentContent) {
+        if let Some(doc) = self.documents.iter_mut().find(|d| d.uid == uid) {
+            doc.state = LoadingState::Loaded(content);
+        }
+    }
+
+    /// Set the loaded content for a document (legacy - combines create and apply)
     pub fn set_document_content(
         &mut self,
         uid: i32,
@@ -156,37 +201,8 @@ impl DocumentState {
         window: &mut Window,
         cx: &mut App,
     ) {
-        if let Some(doc) = self.documents.iter_mut().find(|d| d.uid == uid) {
-            let nodes = document
-                .content
-                .as_array()
-                .map(|arr| arr.clone())
-                .unwrap_or_default();
-
-            let renderer = NodeRenderer::new(nodes.clone(), window, cx);
-            let renderer = cx.new(|_| renderer);
-
-            // Create title input state
-            let title = document.title.clone();
-            let title_input = cx.new(|cx| {
-                let mut state = InputState::new(window, cx).placeholder("Untitled");
-
-                state.set_value(title, window, cx);
-                state
-            });
-
-            // Create the title handler to manage Enter key events
-            let title_handler = cx.new(|cx| {
-                TitleInputHandler::new(uid, title_input.clone(), renderer.clone(), window, cx)
-            });
-
-            doc.state = LoadingState::Loaded(DocumentContent {
-                nodes,
-                renderer,
-                title_input,
-                _title_handler: title_handler,
-            });
-        }
+        let content = Self::create_document_content(uid, &document, window, cx);
+        self.apply_document_content(uid, content);
     }
 
     /// Set error state for a document
