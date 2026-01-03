@@ -10,7 +10,7 @@ use gpui_component::{
 };
 use remindr_gpui::{
     app::{
-        apply_theme,
+        apply_theme, apply_theme_global,
         components::rich_text,
         remindr::Remindr,
         screens::AppRouter,
@@ -119,20 +119,6 @@ async fn main() -> Result<(), Error> {
         theme::init(cx);
         rich_text::init(cx);
 
-        // Load custom themes from the themes directory (~/.config/remindr/themes)
-        let themes_dir = remindr
-            .get_config_dir("remindr")
-            .map(|p| p.join("themes"))
-            .ok();
-
-        if let Some(themes_dir) = themes_dir {
-            if themes_dir.exists() {
-                let _ = ThemeRegistry::watch_dir(themes_dir, cx, move |_cx| {
-                    // Themes will be applied when settings are set
-                });
-            }
-        }
-
         // Set settings as global (must be done before apply_theme)
         if let Ok(settings) = settings {
             cx.set_global(settings);
@@ -146,6 +132,22 @@ async fn main() -> Result<(), Error> {
         cx.activate(true);
 
         let window = open_main_window(cx).expect("failed to open window");
+
+        // Load custom themes from the themes directory (~/.config/remindr/themes)
+        let themes_dir = remindr
+            .get_config_dir("remindr")
+            .map(|p| p.join("themes"))
+            .ok();
+
+        if let Some(themes_dir) = themes_dir {
+            if themes_dir.exists() {
+                let _ = ThemeRegistry::watch_dir(themes_dir, cx, move |cx| {
+                    // Apply theme after custom themes are loaded
+                    apply_theme_global(cx);
+                });
+            }
+        }
+
         window
             .update(cx, |_, window, cx| {
                 window.activate_window();
