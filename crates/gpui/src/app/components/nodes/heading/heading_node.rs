@@ -11,7 +11,7 @@ use crate::{
     app::{
         components::{
             nodes::{
-                element::RemindrElement,
+                element::{NodePayload, RemindrElement},
                 heading::data::HeadingNodeData,
                 menu_provider::{NodeMenuItem, NodeMenuProvider},
                 node::RemindrNode,
@@ -260,38 +260,73 @@ impl TextualNodeDelegate for HeadingNode {
 impl NodeMenuProvider for HeadingNode {
     fn menu_items(&self, _cx: &App) -> Vec<NodeMenuItem> {
         let node_id = self.data.id;
+        let current_level = self.data.metadata.level;
+        let content = self.data.metadata.content.clone();
 
+        let mut items = Vec::new();
+
+        // Add "Text" option to transform heading to text
+        let text_content = content.clone();
+        items.push(NodeMenuItem::new(
+            "transform-to-text",
+            "Text",
+            "icons/pilcrow.svg",
+            move |state, window, cx| {
+                let content = text_content.clone();
+                let state_clone = state.clone();
+                state.update(cx, |state, cx| {
+                    let node = RemindrElement::create_node_with_id(
+                        node_id,
+                        NodePayload::Text((
+                            TextMetadata {
+                                content: content.clone(),
+                            },
+                            true,
+                        )),
+                        &state_clone,
+                        window,
+                        cx,
+                    );
+                    state.replace_node(node_id, &node);
+                });
+            },
+        ));
+
+        // Add heading level options (excluding current level)
         let levels: Vec<(u32, &'static str)> =
             vec![(2, "icons/heading-2.svg"), (3, "icons/heading-3.svg")];
 
-        levels
-            .into_iter()
-            .map(|(level, icon)| {
-                NodeMenuItem::new(
-                    format!("heading-level-{}", level),
-                    format!("Heading {}", level),
-                    icon,
-                    move |state, window, cx| {
-                        let heading_entity = {
-                            let node = state.read(cx).get_current_nodes(node_id);
-                            node.and_then(|n| {
-                                if let RemindrElement::Heading(heading) = &n.element {
-                                    Some(heading.clone())
-                                } else {
-                                    None
-                                }
-                            })
-                        };
+        for (level, icon) in levels {
+            if level == current_level {
+                continue;
+            }
 
-                        if let Some(heading) = heading_entity {
-                            heading.update(cx, |this, cx| {
-                                this.set_level(level, window, cx);
-                            });
-                        }
-                    },
-                )
-            })
-            .collect()
+            items.push(NodeMenuItem::new(
+                format!("heading-level-{}", level),
+                format!("Heading {}", level),
+                icon,
+                move |state, window, cx| {
+                    let heading_entity = {
+                        let node = state.read(cx).get_current_nodes(node_id);
+                        node.and_then(|n| {
+                            if let RemindrElement::Heading(heading) = &n.element {
+                                Some(heading.clone())
+                            } else {
+                                None
+                            }
+                        })
+                    };
+
+                    if let Some(heading) = heading_entity {
+                        heading.update(cx, |this, cx| {
+                            this.set_level(level, window, cx);
+                        });
+                    }
+                },
+            ));
+        }
+
+        items
     }
 }
 

@@ -6,6 +6,7 @@ use crate::app::{
     components::{
         nodes::{
             element::{NodePayload, RemindrElement},
+            heading::data::HeadingMetadata,
             menu_provider::{NodeMenuItem, NodeMenuProvider},
             text::data::{TextMetadata, TextNodeData},
         },
@@ -215,7 +216,43 @@ impl TextNode {
 
 impl NodeMenuProvider for TextNode {
     fn menu_items(&self, _cx: &App) -> Vec<NodeMenuItem> {
-        vec![]
+        let node_id = self.data.id;
+        let content = self.data.metadata.content.clone();
+
+        let levels: Vec<(u32, &'static str)> =
+            vec![(2, "icons/heading-2.svg"), (3, "icons/heading-3.svg")];
+
+        levels
+            .into_iter()
+            .map(|(level, icon)| {
+                let content = content.clone();
+                NodeMenuItem::new(
+                    format!("transform-to-heading-{}", level),
+                    format!("Heading {}", level),
+                    icon,
+                    move |state, window, cx| {
+                        let content = content.clone();
+                        let state_clone = state.clone();
+                        state.update(cx, |state, cx| {
+                            let node = RemindrElement::create_node_with_id(
+                                node_id,
+                                NodePayload::Heading((
+                                    HeadingMetadata {
+                                        level,
+                                        content: content.clone(),
+                                    },
+                                    true,
+                                )),
+                                &state_clone,
+                                window,
+                                cx,
+                            );
+                            state.replace_node(node_id, &node);
+                        });
+                    },
+                )
+            })
+            .collect()
     }
 }
 

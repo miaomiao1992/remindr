@@ -111,7 +111,7 @@ impl SlashMenu {
             focus_handle: cx.focus_handle(),
             search_input,
             items,
-            mode: SlashMenuMode::Replace,
+            mode: SlashMenuMode::InsertAfter,
         }
     }
 
@@ -418,7 +418,7 @@ impl SlashMenu {
 
         self.open = false;
         cx.emit(SlashMenuDismissEvent {
-            restore_focus: self.mode == SlashMenuMode::InsertAfter,
+            restore_focus: false,
         });
         cx.notify();
     }
